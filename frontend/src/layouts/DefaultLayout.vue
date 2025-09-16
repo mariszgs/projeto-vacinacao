@@ -18,7 +18,7 @@
 import { h } from 'vue';
 import { useRouter } from 'vue-router';
 import { NIcon } from 'naive-ui';
-import { HomeOutline, PawOutline } from '@vicons/ionicons5';
+import { HomeOutline, PawOutline, LogOutOutline } from '@vicons/ionicons5';
 
 const router = useRouter();
 
@@ -32,11 +32,20 @@ const menuOptions = [
     label: 'Pets',
     key: 'pets',
     icon: () => h(NIcon, null, { default: () => h(PawOutline) })
+  },
+  {
+    label: 'Sair',
+    key: 'logout',
+    icon: () => h(NIcon, null, { default: () => h(LogOutOutline) })
   }
 ];
 
 function handleSelect(key: string) {
-  if (key === 'home') router.push('/');
-  if (key === 'pets') router.push('/pets');
+  if (key === 'home') router.push('/home');
+  else if (key === 'pets') router.push('/pets');
+  else if (key === 'logout') {
+    // Aqui você pode adicionar qualquer lógica de logout, ex: limpar token, estado, etc
+    router.push('/'); // redireciona para login
+  }
 }
 </script>

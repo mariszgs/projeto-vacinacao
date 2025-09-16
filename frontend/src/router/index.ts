@@ -3,30 +3,42 @@ import Login from '../pages/Login.vue';
 import DefaultLayout from '../layouts/DefaultLayout.vue';
 import Home from '../pages/Home.vue';
 import PetsList from '../pages/Pets/List.vue';
+import PetsCreate from '../pages/Pets/Create.vue'; 
+import PetsView from '../pages/Pets/View.vue';
 
 const routes = [
   {
     path: '/',
     name: 'login',
-    component: Login,
+    component: Login
   },
   {
     path: '/',
-    component: DefaultLayout,  // layout pai para as rotas autenticadas
+    component: DefaultLayout,
     children: [
       {
         path: 'home',
         name: 'home',
-        component: Home,
+        component: Home
       },
       {
         path: 'pets',
         name: 'pets-list',
-        component: PetsList,
+        component: PetsList
       },
-      // Aqui você pode adicionar outras rotas da área logada
-    ],
-  },
+      {
+        path: 'pets/create',
+        name: 'pets-create',
+        component: PetsCreate
+      },
+      {
+       path: '/pets/:id',
+       name: 'pet-view',
+       component: PetsView
+      }
+
+    ]
+  }
 ];
 
 const router = createRouter({
