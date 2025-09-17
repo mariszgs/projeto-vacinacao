@@ -1,20 +1,34 @@
 <template>
-  <n-card title="Detalhes do Pet" class="pet-detail-card">
-    <div class="pet-info">
-      <p><strong>ID:</strong> {{ pet.id }}</p>
-      <p><strong>Nome:</strong> {{ pet.name }}</p>
-      <p><strong>Espécie:</strong> {{ pet.species }}</p>
-      <p><strong>Idade:</strong> {{ pet.age }} anos</p>
-    </div>
-
+  <n-card title="Vacinas do Pet" class="pet-detail-card">
     <div class="vaccines-section">
-      <h3>Vacinações</h3>
+      <h3>Vacinas Atrasadas</h3>
       <ul class="vaccines-list">
-        <li v-for="vacina in pet.vaccines" :key="vacina.id" class="vaccine-item">
+        <li v-for="vacina in overdueVaccines" :key="vacina.id" class="vaccine-item">
           <span class="vaccine-name">{{ vacina.name }}</span>  
           <span class="vaccine-date">{{ vacina.date }}</span>  
-          <span :style="{ color: isVaccineLate(vacina.date) ? 'red' : 'green' }" class="vaccine-status">
-            {{ isVaccineLate(vacina.date) ? 'Atrasada' : 'Em dia' }}
+          <span class="vaccine-status" style="color: red;">
+            Atrasada
+          </span>
+        </li>
+      </ul>
+      
+      <h3>Vacinas em Dia</h3>
+      <ul class="vaccines-list">
+        <li v-for="vacina in inDateVaccines" :key="vacina.id" class="vaccine-item">
+          <span class="vaccine-name">{{ vacina.name }}</span>  
+          <span class="vaccine-date">{{ vacina.date }}</span>  
+          <span class="vaccine-status" style="color: green;">
+            Em Dia
+          </span>
+        </li>
+      </ul>
+      
+      <h3>Vacinas Necessárias</h3>
+      <ul class="vaccines-list">
+        <li v-for="vacina in necessaryVaccines" :key="vacina.name" class="vaccine-item">
+          <span class="vaccine-name">{{ vacina.name }}</span>  
+          <span class="vaccine-status" style="color: orange;">
+            Necessária
           </span>
         </li>
       </ul>
@@ -25,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 interface Vaccine {
@@ -53,9 +67,10 @@ const pet = ref<Pet>({
   vaccines: []
 });
 
+// Simulação de dados
 onMounted(() => {
   const petId = Number(route.params.id);
-  // Simulação de dados
+  // Simulação de dados do pet
   pet.value = {
     id: petId,
     name: petId === 1 ? 'Rex' : 'Mimi',
@@ -63,12 +78,13 @@ onMounted(() => {
     age: petId === 1 ? 4 : 2,
     vaccines: [
       { id: 1, name: 'Vacina Raiva', date: '2025-01-10' },
-      { id: 2, name: 'Vacina V8', date: '2022-03-15' } // exemplo atrasada
+      { id: 2, name: 'Vacina V8', date: '2022-03-15' },
+      { id: 3, name: 'Vacina Parvovirose', date: '2023-04-01' } // Exemplo de vacina em dia
     ]
   };
 });
 
-// Função que retorna true se a vacina está atrasada
+// Função que retorna se a vacina está atrasada (mais de 365 dias)
 function isVaccineLate(vacDate: string): boolean {
   const dateVaccine = new Date(vacDate);
   const now = new Date();
@@ -77,6 +93,33 @@ function isVaccineLate(vacDate: string): boolean {
   return diffDays > 365; // mais de 365 dias = atrasada
 }
 
+// Filtrando as vacinas
+const overdueVaccines = computed(() => {
+  return pet.value.vaccines.filter(vacina => isVaccineLate(vacina.date));
+});
+
+const inDateVaccines = computed(() => {
+  return pet.value.vaccines.filter(vacina => !isVaccineLate(vacina.date));
+});
+
+// Vacinas necessárias dependendo do tipo de animal
+const necessaryVaccines = computed(() => {
+  if (pet.value.species === 'Cachorro') {
+    return [
+      { name: 'Vacina Raiva' },
+      { name: 'Vacina V8' },
+      { name: 'Vacina Parvovirose' },
+    ];
+  } else if (pet.value.species === 'Gato') {
+    return [
+      { name: 'Vacina V3' },
+      { name: 'Vacina Leucemia Felina' },
+    ];
+  }
+  return [];
+});
+
+// Função de voltar
 function goBack() {
   router.back();
 }
@@ -90,12 +133,6 @@ function goBack() {
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   background-color: #fff;
-}
-
-.pet-info p {
-  margin-bottom: 20px;
-  font-size: 16px;
-  color: #333;
 }
 
 .vaccines-section {
@@ -143,6 +180,10 @@ function goBack() {
   color: red;
 }
 
+.vaccine-status.orange {
+  color: orange;
+}
+
 .back-button {
   margin-top: 20px;
   background-color: #4CAF50;
@@ -156,24 +197,5 @@ function goBack() {
 
 .back-button:hover {
   background-color: #45a049;
-}
-
-@media (max-width: 600px) {
-  .pet-detail-card {
-    padding: 15px;
-    max-width: 100%;
-  }
-
-  .pet-info p {
-    font-size: 14px;
-  }
-
-  .vaccines-section h3 {
-    font-size: 18px;
-  }
-
-  .vaccines-item {
-    font-size: 14px;
-  }
 }
 </style>

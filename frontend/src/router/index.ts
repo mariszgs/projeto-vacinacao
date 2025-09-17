@@ -7,6 +7,7 @@ import PetsCreate from '../pages/Pets/Create.vue';
 import PetsView from '../pages/Pets/View.vue';
 import PetsEdit from '../pages/Pets/Edit.vue';
 import Profile from '../pages/Profile.vue';
+import Schedule from '../pages/Schedule.vue';
 
 const routes = [
   {
@@ -47,6 +48,11 @@ const routes = [
         path: 'profile',
         name: 'profile',
         component: Profile
+      },
+      {
+        path: 'schedule/:id',
+        name: 'schedule',
+        component: Schedule
       }
 
     ]

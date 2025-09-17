@@ -54,6 +54,11 @@ function goToDelete(id: number) {
   }
 }
 
+function goToSchedule(id: number) {
+  // Redireciona para a página de agendamento com o ID do pet
+  router.push(`/schedule/${id}`);
+}
+
 // Colunas com coluna customizada de ações
 const columns = [
   { title: 'ID', key: 'id' },
@@ -96,6 +101,16 @@ const columns = [
               style: 'margin-left: 5px;' // Garantindo que o botão de excluir tenha espaçamento adequado
             },
             { default: () => 'Excluir' }
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'success', // Botão de agendamento com cor verde
+              onClick: () => goToSchedule(row.id),
+              style: 'margin-left: 10px;' // Espaçamento adequado
+            },
+            { default: () => 'Agendar Vacinação' }
           )
         ]
       );
@@ -103,3 +118,19 @@ const columns = [
   }
 ];
 </script>
+
+<style scoped>
+/* Estilos personalizados para o formulário de edição */
+n-card {
+  max-width: 600px;
+  margin: 20px auto;
+}
+
+n-form-item {
+  margin-bottom: 16px;
+}
+
+n-button {
+  margin-top: 16px;
+}
+</style>
