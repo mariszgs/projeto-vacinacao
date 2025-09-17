@@ -43,6 +43,17 @@ function goToView(id: number) {
   router.push(`/pets/${id}`);
 }
 
+function goToEdit(id: number) {
+  router.push(`/pets/edit/${id}`);
+}
+
+function goToDelete(id: number) {
+  if (confirm('Tem certeza que deseja excluir este pet?')) {
+    pets.value = pets.value.filter(pet => pet.id !== id);
+    console.log(`Pet com ID ${id} excluído`);
+  }
+}
+
 // Colunas com coluna customizada de ações
 const columns = [
   { title: 'ID', key: 'id' },
@@ -54,12 +65,39 @@ const columns = [
     key: 'actions',
     render(row: Pet) {
       return h(
-        NButton,
-        {
-          size: 'small',
-          onClick: () => goToView(row.id)
-        },
-        { default: () => 'Visualizar' }
+        'div', // Usando um contêiner div para empacotar os botões
+        {},
+        [
+          h(
+            NButton,
+            {
+              size: 'small',
+              onClick: () => goToView(row.id),
+              style: 'margin-right: 10px;' // Espaçamento entre os botões
+            },
+            { default: () => 'Visualizar' }
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'warning', // Botão de edição com cor diferente
+              onClick: () => goToEdit(row.id),
+              style: 'margin-right: 5px;' // Ajustando o espaçamento 
+            },
+            { default: () => 'Editar' }
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'error', // Botão de excluir com cor vermelha
+              onClick: () => goToDelete(row.id),
+              style: 'margin-left: 5px;' // Garantindo que o botão de excluir tenha espaçamento adequado
+            },
+            { default: () => 'Excluir' }
+          )
+        ]
       );
     }
   }

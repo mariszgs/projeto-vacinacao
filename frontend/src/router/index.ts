@@ -5,6 +5,8 @@ import Home from '../pages/Home.vue';
 import PetsList from '../pages/Pets/List.vue';
 import PetsCreate from '../pages/Pets/Create.vue'; 
 import PetsView from '../pages/Pets/View.vue';
+import PetsEdit from '../pages/Pets/Edit.vue';
+import Profile from '../pages/Profile.vue';
 
 const routes = [
   {
@@ -35,6 +37,16 @@ const routes = [
        path: '/pets/:id',
        name: 'pet-view',
        component: PetsView
+      },
+      {
+        path: '/pets/edit/:id',
+        name: 'pet-edit',
+        component: PetsEdit
+      },
+      {
+        path: 'profile',
+        name: 'profile',
+        component: Profile
       }
 
     ]

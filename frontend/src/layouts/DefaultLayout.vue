@@ -18,7 +18,7 @@
 import { h } from 'vue';
 import { useRouter } from 'vue-router';
 import { NIcon } from 'naive-ui';
-import { HomeOutline, PawOutline, LogOutOutline } from '@vicons/ionicons5';
+import { HomeOutline, PawOutline, LogOutOutline, PersonCircleOutline } from '@vicons/ionicons5';
 
 const router = useRouter();
 
@@ -34,6 +34,11 @@ const menuOptions = [
     icon: () => h(NIcon, null, { default: () => h(PawOutline) })
   },
   {
+    label: 'Perfil',
+    key: 'profile',
+    icon: () => h(NIcon, null, { default: () => h(PersonCircleOutline) }) // Ícone de perfil
+  },
+  {
     label: 'Sair',
     key: 'logout',
     icon: () => h(NIcon, null, { default: () => h(LogOutOutline) })
@@ -43,6 +48,7 @@ const menuOptions = [
 function handleSelect(key: string) {
   if (key === 'home') router.push('/home');
   else if (key === 'pets') router.push('/pets');
+  else if (key === 'profile') router.push('/profile'); // Redireciona para a página de perfil
   else if (key === 'logout') {
     // Aqui você pode adicionar qualquer lógica de logout, ex: limpar token, estado, etc
     router.push('/'); // redireciona para login
