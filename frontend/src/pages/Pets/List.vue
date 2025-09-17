@@ -96,22 +96,22 @@ const columns = [
             NButton,
             {
               size: 'small',
-              type: 'error', // Botão de excluir com cor vermelha
-              onClick: () => goToDelete(row.id),
-              style: 'margin-left: 5px;' // Garantindo que o botão de excluir tenha espaçamento adequado
+              type: 'success', // Botão de agendamento com cor verde
+              onClick: () => goToSchedule(row.id),
+              style: 'margin-left: 5px;' // Espaçamento adequado
             },
-            { default: () => 'Excluir' }
+            { default: () => 'Agendar Vacinação' }
           ),
-          h(
+           h(
             NButton,
             {
               size: 'small',
-              type: 'success', // Botão de agendamento com cor verde
-              onClick: () => goToSchedule(row.id),
-              style: 'margin-left: 10px;' // Espaçamento adequado
+              type: 'error', // Botão de excluir com cor vermelha
+              onClick: () => goToDelete(row.id),
+              style: 'margin-left: 10px;' // Garantindo que o botão de excluir tenha espaçamento adequado
             },
-            { default: () => 'Agendar Vacinação' }
-          )
+            { default: () => 'Excluir' }
+          ),
         ]
       );
     }
