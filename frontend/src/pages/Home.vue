@@ -2,9 +2,6 @@
   <div>
     <h1>Bem-vindo ao Projeto Vacinação</h1>
 
-    <!-- Grid Responsivo de Estatísticas -->
-
-
     <!-- Alerta de Vacinas Atrasadas -->
     <n-alert
       v-if="overdueVaccines > 0"
@@ -38,8 +35,6 @@ import { ptBR } from "date-fns/locale/pt-BR";
 import { format } from "date-fns";
 
 // Dados simulados
-const totalPets = ref(20);
-const vaccinesApplied = ref(150);
 const overdueVaccines = ref(3);
 
 // Timestamp

@@ -5,7 +5,7 @@
       <ul class="vaccines-list">
         <li v-for="vacina in overdueVaccines" :key="vacina.id" class="vaccine-item">
           <span class="vaccine-name">{{ vacina.name }}</span>  
-          <span class="vaccine-date">{{ vacina.date }}</span>  
+          <span class="vaccine-date">{{ formatDateBR(vacina.date) }}</span> 
           <span class="vaccine-status" style="color: red;">
             Atrasada
           </span>
@@ -16,7 +16,7 @@
       <ul class="vaccines-list">
         <li v-for="vacina in inDateVaccines" :key="vacina.id" class="vaccine-item">
           <span class="vaccine-name">{{ vacina.name }}</span>  
-          <span class="vaccine-date">{{ vacina.date }}</span>  
+          <span class="vaccine-date">{{ formatDateBR(vacina.date) }}</span>  
           <span class="vaccine-status" style="color: green;">
             Em Dia
           </span>
@@ -92,6 +92,16 @@ function isVaccineLate(vacDate: string): boolean {
   const diffDays = diffTime / (1000 * 3600 * 24);
   return diffDays > 365; // mais de 365 dias = atrasada
 }
+
+function formatDateBR(dateStr: string): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // mês começa do 0
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
 
 // Filtrando as vacinas
 const overdueVaccines = computed(() => {

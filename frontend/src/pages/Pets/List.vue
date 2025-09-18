@@ -1,16 +1,17 @@
 <template>
-  <n-card title="Lista de Pets" class="pet-card">
-    <div class="header-actions">
-      <n-button type="primary" @click="goToCreate">
-        Adicionar Novo Pet
-      </n-button>
-    </div>
-
+  <n-card title="Lista de Pets" style="position: relative;">
+    <n-button
+      type="primary"
+      style="position: absolute; top: 16px; right: 16px;"
+      @click="goToCreate"
+    >
+      Adicionar Novo Pet
+    </n-button>
     <n-data-table
       :columns="columns"
       :data="pets"
-      class="pet-table"
-      :scroll="{ x: 800 }"
+      style="margin-top: 48px;"
+      :scroll="{ x: '100%' }"
     />
   </n-card>
 </template>
@@ -37,41 +38,48 @@ const pets = ref<Pet[]>([
 function goToCreate() {
   router.push('/pets/create');
 }
+
 function goToView(id: number) {
   router.push(`/pets/${id}`);
 }
+
 function goToEdit(id: number) {
   router.push(`/pets/edit/${id}`);
 }
+
 function goToDelete(id: number) {
   if (confirm('Tem certeza que deseja excluir este pet?')) {
     pets.value = pets.value.filter(pet => pet.id !== id);
+    console.log(`Pet com ID ${id} excluído`);
   }
 }
+
 function goToSchedule(id: number) {
   router.push(`/schedule/${id}`);
 }
 
+// Colunas com coluna customizada de ações
 const columns = [
-  { title: 'ID', key: 'id', width: 60 },
-  { title: 'Nome', key: 'name', width: 150 },
-  { title: 'Espécie', key: 'species', width: 120 },
-  { title: 'Idade', key: 'age', width: 80 },
+  { title: 'ID', key: 'id' },
+  { title: 'Nome', key: 'name' },
+  { title: 'Espécie', key: 'species' },
+  { title: 'Idade', key: 'age' },
   {
-    title: 'Ações',
+  
     key: 'actions',
-    width: 350,
     render(row: Pet) {
       return h(
-        'div',
-        { class: 'actions-container' },
+        'div', // Usando um contêiner div para empacotar os botões
+        {
+          style: 'display: flex; gap: 10px; justify-content: space-between;'
+        },
         [
           h(
             NButton,
             {
               size: 'small',
               onClick: () => goToView(row.id),
-              class: 'action-button'
+              style: 'flex-grow: 1;' // Faz com que o botão ocupe toda a largura disponível
             },
             { default: () => 'Visualizar' }
           ),
@@ -80,7 +88,7 @@ const columns = [
             {
               size: 'small',
               onClick: () => goToEdit(row.id),
-              class: 'action-button'
+              style: 'flex-grow: 1;' // O mesmo para o botão de editar
             },
             { default: () => 'Editar' }
           ),
@@ -89,7 +97,7 @@ const columns = [
             {
               size: 'small',
               onClick: () => goToSchedule(row.id),
-              class: 'action-button'
+              style: 'flex-grow: 1;' // O mesmo para o botão de agendar
             },
             { default: () => 'Agendar Vacinação' }
           ),
@@ -98,7 +106,7 @@ const columns = [
             {
               size: 'small',
               onClick: () => goToDelete(row.id),
-              class: 'action-button'
+              style: 'flex-grow: 1;' // O mesmo para o botão de excluir
             },
             { default: () => 'Excluir' }
           )
@@ -110,48 +118,17 @@ const columns = [
 </script>
 
 <style scoped>
-.pet-card {
+/* Estilos personalizados para o formulário de edição */
+n-card {
+  max-width: 600px;
   margin: 20px auto;
-  max-width: 100%;
-  overflow-x: auto;
 }
 
-.header-actions {
-  display: flex;
-  justify-content: flex-end;
+n-form-item {
   margin-bottom: 16px;
 }
 
-.pet-table {
-  width: 100%;
-}
-
-/* Botões de ação */
-.actions-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-start;
-}
-
-.action-button {
-  flex: 1 1 45%;
-  min-width: 100px;
-}
-
-/* Responsividade para celular */
-@media (max-width: 600px) {
-  .actions-container {
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .action-button {
-    width: 100%;
-  }
-
-  .header-actions {
-    justify-content: center;
-  }
+n-button {
+  margin-top: 16px;
 }
 </style>

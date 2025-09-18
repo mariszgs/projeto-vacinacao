@@ -17,7 +17,7 @@
         <ul class="vaccines-list">
           <li v-for="vacina in overdueVaccines" :key="vacina.id" class="vaccine-item">
             <span class="vaccine-name">{{ vacina.name }}</span>  
-            <span class="vaccine-date">{{ vacina.date }}</span>  
+            <span class="vaccine-date">{{ formatDateBR(vacina.date) }}</span>  
             <span class="vaccine-status" style="color: red;">Atrasada</span>
           </li>
         </ul>
@@ -146,6 +146,16 @@ function scheduleVaccination() {
 function loadPetVaccines() {
   showVaccineSelector.value = false; // Esconde o seletor de vacina até que o ID do pet seja selecionado
 }
+
+function formatDateBR(dateStr: string): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
 
 // Dados de opções de pet
 const petOptions = computed(() => pets.map(pet => ({ label: pet.name, value: pet.id })));

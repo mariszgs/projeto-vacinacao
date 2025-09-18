@@ -10,9 +10,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, h } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { NButton } from 'naive-ui';
 
 interface Vaccine {
   id: number;
@@ -23,12 +22,12 @@ interface Vaccine {
   lastApplied: string;
   applicationInterval: string;
   status: string;
-  type: string;
+  type?: string;
 }
 
 const router = useRouter();
 
-// Dados simulados de vacinas (Você pode substituir por dados reais de uma API ou banco de dados)
+// Dados simulados
 const vaccines = ref<Vaccine[]>([
   {
     id: 1,
@@ -62,26 +61,47 @@ const vaccines = ref<Vaccine[]>([
   }
 ]);
 
-// Definindo as colunas da tabela
+// Função para formatar datas no padrão brasileiro
+function formatDateBR(dateStr: string): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+// Definindo as colunas da tabela com datas formatadas
 const columns = [
   { title: 'ID', key: 'id' },
   { title: 'Nome', key: 'name' },
   { title: 'Descrição', key: 'description' },
-  { title: 'Data de Criação', key: 'createdAt' },
-  { title: 'Obrigatória', key: 'isMandatory', render(row: Vaccine) { return row.isMandatory ? 'Sim' : 'Não'; } },
-  { title: 'Última Aplicação', key: 'lastApplied' },
+  { 
+    title: 'Data de Criação', 
+    key: 'createdAt', 
+    render: (row: Vaccine) => formatDateBR(row.createdAt)
+  },
+  { 
+    title: 'Obrigatória', 
+    key: 'isMandatory', 
+    render: (row: Vaccine) => row.isMandatory ? 'Sim' : 'Não' 
+  },
+  { 
+    title: 'Última Aplicação', 
+    key: 'lastApplied',
+    render: (row: Vaccine) => formatDateBR(row.lastApplied)
+  },
   { title: 'Intervalo de Aplicação', key: 'applicationInterval' },
   { title: 'Status', key: 'status' },
 ];
 
-// Função para redirecionar para a página de detalhes de uma vacina
+// Função para redirecionar para detalhes da vacina
 function goToView(id: number) {
-  router.push(`/vaccines/${id}`);  // Redireciona para a página de detalhes da vacina
+  router.push(`/vaccines/${id}`);
 }
 </script>
 
 <style scoped>
-/* Estilos personalizados para o cartão de vacinas */
 n-card {
   max-width: 800px;
   margin: 20px auto;

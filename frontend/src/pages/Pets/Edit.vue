@@ -29,6 +29,8 @@
               type="date"
               placeholder="Data da vacina"
               :disabled-date="disabledDate"
+              format="dd/MM/yyyy"
+              value-format="yyyy-MM-dd"
             />
           </n-col>
         </n-row>
@@ -36,7 +38,7 @@
           type="error"
           size="small"
           @click="removeVaccine(index)"
-           style="margin-top: 12px; margin-bottom: 12px; margin-left: 5px;"
+          style="margin-top: 12px; margin-bottom: 12px; margin-left: 5px;"
         >
           Remover Vacina
         </n-button>
@@ -88,11 +90,10 @@ function disabledDate(current: Date): boolean {
 // Carregar dados do pet quando a página for carregada
 onMounted(() => {
   const petId = Number(route.params.id); // O id do pet é obtido pela rota
-  // Aqui você pode carregar os dados do pet com base no id, por exemplo, via API
   // Exemplo fictício de dados:
   pet.value = {
     id: petId,
-    name: 'Rex', 
+    name: 'Rex',
     species: 'Cachorro',
     age: 4,
     vaccines: [
@@ -100,12 +101,16 @@ onMounted(() => {
       { id: 2, name: 'Vacina V8', date: '2022-03-15' }
     ]
   };
+
+  // Converte datas para objetos Date, assim o NDatePicker consegue exibir corretamente
+  pet.value.vaccines.forEach(v => {
+    if (v.date) v.date = new Date(v.date);
+  });
 });
 
 // Adicionar nova vacina
 function addVaccine() {
-  // Gerando um ID único para a nova vacina
-  const newVaccine = { id: Date.now(), name: '', date: null };  // Inicializando a data como null
+  const newVaccine = { id: Date.now(), name: '', date: null };
   pet.value.vaccines.push(newVaccine);
 }
 
@@ -117,8 +122,7 @@ function removeVaccine(index: number) {
 // Função de salvar pet
 function savePet() {
   console.log('Salvando pet:', pet.value);
-  // Aqui você pode realizar a lógica para salvar os dados, como enviar para a API
-  router.push('/pets'); // Redireciona para a lista de pets
+  router.push('/pets');
 }
 
 // Função para voltar à lista de pets
@@ -128,7 +132,6 @@ function goBack() {
 </script>
 
 <style scoped>
-/* Estilos personalizados para o formulário de edição */
 n-card {
   max-width: 600px;
   margin: 20px auto;

@@ -24,7 +24,7 @@
           :options="vaccinesOptions"
           multiple
           placeholder="Selecione as vacinas tomadas"
-          @change="handleVaccinesTakenChange"
+          @update:value="handleVaccinesTakenChange"
         />
       </n-form-item>
 
@@ -35,6 +35,8 @@
             type="date"
             placeholder="Selecione a data"
             :disabled-date="disabledDate"
+            format="dd/MM/yyyy"
+            value-format="yyyy-MM-dd"
           />
         </n-form-item>
       </div>
@@ -46,7 +48,7 @@
           :options="vaccinesOptions"
           multiple
           placeholder="Selecione as vacinas a tomar"
-          @change="handleVaccinesToTakeChange"
+          @update:value="handleVaccinesToTakeChange"
         />
       </n-form-item>
 
@@ -57,6 +59,8 @@
             type="date"
             placeholder="Selecione a data"
             :disabled-date="disabledDate"
+            format="dd/MM/yyyy"
+            value-format="yyyy-MM-dd"
           />
         </n-form-item>
       </div>
@@ -135,23 +139,35 @@ function disabledDate(current: Date): boolean {
 
 // Atualiza as datas para as vacinas tomadas
 function handleVaccinesTakenChange(selectedVaccines: string[]) {
-  // Adiciona datas vazias para cada vacina selecionada
   form.vaccinesTakenDates = new Array(selectedVaccines.length).fill(null);
 }
 
 // Atualiza as datas para as vacinas a tomar
 function handleVaccinesToTakeChange(selectedVaccines: string[]) {
-  // Adiciona datas vazias para cada vacina selecionada
   form.vaccinesToTakeDates = new Array(selectedVaccines.length).fill(null);
+}
+
+// Função para formatar datas para dd/MM/yyyy
+function formatDateBR(dateStr: string | null) {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 function submitForm() {
   formRef.value.validate((valid: boolean) => {
     if (valid) {
-      // Aqui você faria a chamada para salvar o pet no backend ou state global
-      console.log('Pet cadastrado:', { ...form });
+      const formData = {
+        ...form,
+        vaccinesTakenDates: form.vaccinesTakenDates.map(formatDateBR),
+        vaccinesToTakeDates: form.vaccinesToTakeDates.map(formatDateBR),
+      };
 
-      // Após salvar, redireciona para a lista de pets
+      console.log('Pet cadastrado com datas no formato BR:', formData);
+
       router.push('/pets');
     } else {
       console.log('Erro na validação do formulário');
