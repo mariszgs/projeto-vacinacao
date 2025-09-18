@@ -1,17 +1,16 @@
 <template>
-  <n-card title="Lista de Pets" style="position: relative;">
-    <n-button
-      type="primary"
-      style="position: absolute; top: 16px; right: 16px;"
-      @click="goToCreate"
-    >
-      Adicionar Novo Pet
-    </n-button>
+  <n-card title="Lista de Pets" class="pet-card">
+    <div class="header-actions">
+      <n-button type="primary" @click="goToCreate">
+        Adicionar Novo Pet
+      </n-button>
+    </div>
+
     <n-data-table
       :columns="columns"
       :data="pets"
-      style="margin-top: 48px;"
-      :scroll="{ x: '100%' }"
+      class="pet-table"
+      :scroll="{ x: 800 }"
     />
   </n-card>
 </template>
@@ -38,47 +37,41 @@ const pets = ref<Pet[]>([
 function goToCreate() {
   router.push('/pets/create');
 }
-
 function goToView(id: number) {
   router.push(`/pets/${id}`);
 }
-
 function goToEdit(id: number) {
   router.push(`/pets/edit/${id}`);
 }
-
 function goToDelete(id: number) {
   if (confirm('Tem certeza que deseja excluir este pet?')) {
     pets.value = pets.value.filter(pet => pet.id !== id);
-    console.log(`Pet com ID ${id} excluído`);
   }
 }
-
 function goToSchedule(id: number) {
-  // Redireciona para a página de agendamento com o ID do pet
   router.push(`/schedule/${id}`);
 }
 
-// Colunas com coluna customizada de ações
 const columns = [
-  { title: 'ID', key: 'id' },
-  { title: 'Nome', key: 'name' },
-  { title: 'Espécie', key: 'species' },
-  { title: 'Idade', key: 'age' },
+  { title: 'ID', key: 'id', width: 60 },
+  { title: 'Nome', key: 'name', width: 150 },
+  { title: 'Espécie', key: 'species', width: 120 },
+  { title: 'Idade', key: 'age', width: 80 },
   {
     title: 'Ações',
     key: 'actions',
+    width: 350,
     render(row: Pet) {
       return h(
-        'div', // Usando um contêiner div para empacotar os botões
-        {},
+        'div',
+        { class: 'actions-container' },
         [
           h(
             NButton,
             {
               size: 'small',
               onClick: () => goToView(row.id),
-              style: 'margin-right: 10px;' // Espaçamento entre os botões
+              class: 'action-button'
             },
             { default: () => 'Visualizar' }
           ),
@@ -86,9 +79,8 @@ const columns = [
             NButton,
             {
               size: 'small',
-              type: 'warning', // Botão de edição com cor diferente
               onClick: () => goToEdit(row.id),
-              style: 'margin-right: 5px;' // Ajustando o espaçamento 
+              class: 'action-button'
             },
             { default: () => 'Editar' }
           ),
@@ -96,22 +88,20 @@ const columns = [
             NButton,
             {
               size: 'small',
-              type: 'success', // Botão de agendamento com cor verde
               onClick: () => goToSchedule(row.id),
-              style: 'margin-left: 5px;' // Espaçamento adequado
+              class: 'action-button'
             },
             { default: () => 'Agendar Vacinação' }
           ),
-           h(
+          h(
             NButton,
             {
               size: 'small',
-              type: 'error', // Botão de excluir com cor vermelha
               onClick: () => goToDelete(row.id),
-              style: 'margin-left: 10px;' // Garantindo que o botão de excluir tenha espaçamento adequado
+              class: 'action-button'
             },
             { default: () => 'Excluir' }
-          ),
+          )
         ]
       );
     }
@@ -120,17 +110,48 @@ const columns = [
 </script>
 
 <style scoped>
-/* Estilos personalizados para o formulário de edição */
-n-card {
-  max-width: 600px;
+.pet-card {
   margin: 20px auto;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
-n-form-item {
+.header-actions {
+  display: flex;
+  justify-content: flex-end;
   margin-bottom: 16px;
 }
 
-n-button {
-  margin-top: 16px;
+.pet-table {
+  width: 100%;
+}
+
+/* Botões de ação */
+.actions-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.action-button {
+  flex: 1 1 45%;
+  min-width: 100px;
+}
+
+/* Responsividade para celular */
+@media (max-width: 600px) {
+  .actions-container {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .action-button {
+    width: 100%;
+  }
+
+  .header-actions {
+    justify-content: center;
+  }
 }
 </style>
