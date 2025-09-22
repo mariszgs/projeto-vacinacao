@@ -28,6 +28,7 @@
         <p><strong>Descrição:</strong> {{ vaccine.description }}</p>
         <p><strong>Obrigatória:</strong> {{ vaccine.isMandatory ? 'Sim' : 'Não' }}</p>
         <p><strong>Última Aplicação:</strong> {{ formatDateBR(vaccine.lastApplied) }}</p>
+        <p><strong>Data de Validade:</strong> {{ formatDateBR(vaccine.validUntil) }}</p>
         <p><strong>Intervalo:</strong> {{ vaccine.applicationInterval }}</p>
         <p><strong>Status:</strong> {{ vaccine.status }}</p>
       </n-card>
@@ -39,51 +40,18 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 
+const router = useRouter();
+
 interface Vaccine {
   id: number;
   name: string;
   description: string;
-  createdAt: string;
+  validUntil: string; // 🔁 era createdAt
   isMandatory: boolean;
   lastApplied: string;
   applicationInterval: string;
   status: string;
 }
-
-const router = useRouter();
-
-const vaccines = ref<Vaccine[]>([
-  {
-    id: 1,
-    name: "Vacina Raiva",
-    description: "Prevenção contra a raiva em cães e gatos.",
-    createdAt: "2000-01-01",
-    isMandatory: true,
-    lastApplied: "2023-01-15",
-    applicationInterval: "1 ano",
-    status: "Em circulação",
-  },
-  {
-    id: 2,
-    name: "Vacina V8",
-    description: "Protege contra 8 doenças em cães.",
-    createdAt: "2010-03-10",
-    isMandatory: true,
-    lastApplied: "2022-12-20",
-    applicationInterval: "1 ano",
-    status: "Em circulação",
-  },
-  {
-    id: 3,
-    name: "Vacina V3",
-    description: "Vacina para gatos que previne várias doenças.",
-    createdAt: "2005-05-30",
-    isMandatory: false,
-    lastApplied: "2022-09-12",
-    applicationInterval: "1 ano",
-    status: "Em circulação",
-  },
-]);
 
 function formatDateBR(dateStr: string): string {
   if (!dateStr) return "";
@@ -98,15 +66,48 @@ function goToCreate() {
   router.push("/vaccines/create");
 }
 
-// Colunas da tabela para desktop, sem a coluna de ações
+const vaccines = ref<Vaccine[]>([
+  {
+    id: 1,
+    name: "Vacina Raiva",
+    description: "Prevenção contra a raiva em cães e gatos.",
+    validUntil: "2026-01-01", // 🔁 era createdAt
+    isMandatory: true,
+    lastApplied: "2023-01-15",
+    applicationInterval: "1 ano",
+    status: "Em circulação",
+  },
+  {
+    id: 2,
+    name: "Vacina V8",
+    description: "Protege contra 8 doenças em cães.",
+    validUntil: "2025-03-10",
+    isMandatory: true,
+    lastApplied: "2022-12-20",
+    applicationInterval: "1 ano",
+    status: "Em circulação",
+  },
+  {
+    id: 3,
+    name: "Vacina V3",
+    description: "Vacina para gatos que previne várias doenças.",
+    validUntil: "2025-05-30",
+    isMandatory: false,
+    lastApplied: "2022-09-12",
+    applicationInterval: "1 ano",
+    status: "Em circulação",
+  },
+]);
+
+// Tabela para desktop
 const columns = [
   { title: "ID", key: "id" },
   { title: "Nome", key: "name" },
   { title: "Descrição", key: "description" },
   {
-    title: "Data de Criação",
-    key: "createdAt",
-    render: (row: Vaccine) => formatDateBR(row.createdAt),
+    title: "Data de Validade", // 🔁 era "Data de Criação"
+    key: "validUntil",
+    render: (row: Vaccine) => formatDateBR(row.validUntil),
   },
   {
     title: "Obrigatória",
@@ -121,6 +122,7 @@ const columns = [
   { title: "Intervalo de Aplicação", key: "applicationInterval" },
   { title: "Status", key: "status" },
 ];
+
 </script>
 
 <style scoped>
