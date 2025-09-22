@@ -6,7 +6,7 @@
       :collapsed="isCollapsed"
       :collapsed-width="64"
       width="200"
-      show-trigger="bar"
+      :show-trigger="!isMobile"
       collapse-mode="width"
       @collapse="isCollapsed = true"
       @expand="isCollapsed = false"
@@ -31,24 +31,41 @@
 </template>
 
 <script setup lang="ts">
-import { h, ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { NIcon } from 'naive-ui';
+import { h, ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { NIcon } from 'naive-ui'
 import {
   HomeOutline,
   PawOutline,
   LogOutOutline,
   PersonCircleOutline,
   MedicalOutline
-} from '@vicons/ionicons5';
+} from '@vicons/ionicons5'
 
-const router = useRouter();
-const isCollapsed = ref(window.innerWidth <= 768); // Colapsar automaticamente no mobile
+const router = useRouter()
+const isCollapsed = ref(false)
 
-// Atualiza quando a tela redimensiona
-window.addEventListener('resize', () => {
-  isCollapsed.value = window.innerWidth <= 768;
-});
+// Detecta se é mobile com reactive
+const screenWidth = ref(window.innerWidth)
+const isMobile = computed(() => screenWidth.value <= 768)
+
+// Ajusta isCollapsed conforme dispositivo
+function handleResize() {
+  screenWidth.value = window.innerWidth
+  if (isMobile.value) {
+    isCollapsed.value = true // sempre colapsado no mobile
+  } else {
+    isCollapsed.value = false // desktop começa expandido
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('resize', handleResize)
+  handleResize() // inicializa
+})
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
 
 const menuOptions = [
   {
@@ -76,13 +93,13 @@ const menuOptions = [
     key: 'logout',
     icon: () => h(NIcon, null, { default: () => h(LogOutOutline) })
   }
-];
+]
 
 function handleSelect(key: string) {
-  if (key === 'home') router.push('/home');
-  else if (key === 'pets') router.push('/pets');
-  else if (key === 'profile') router.push('/profile');
-  else if (key === 'vaccines') router.push('/vaccines');
-  else if (key === 'logout') router.push('/');
+  if (key === 'home') router.push('/home')
+  else if (key === 'pets') router.push('/pets')
+  else if (key === 'profile') router.push('/profile')
+  else if (key === 'vaccines') router.push('/vaccines')
+  else if (key === 'logout') router.push('/')
 }
 </script>

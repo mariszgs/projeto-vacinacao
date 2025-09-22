@@ -18,30 +18,30 @@
       </n-form-item>
 
       <!-- Lista de Vacinas -->
-      <n-form-item label="Vacinas" v-for="(vacina, index) in pet.vaccines" :key="vacina.id">
-        <n-row>
-          <n-col span="12">
-            <n-input v-model:value="vacina.name" placeholder="Nome da vacina" />
-          </n-col>
-          <n-col span="12">
-            <n-date-picker
-              v-model:value="vacina.date"
-              type="date"
-              placeholder="Data da vacina"
-              :disabled-date="disabledDate"
-              format="dd/MM/yyyy"
-              value-format="yyyy-MM-dd"
-            />
-          </n-col>
-        </n-row>
-        <n-button
-          type="error"
-          size="small"
-          @click="removeVaccine(index)"
-          style="margin-top: 12px; margin-bottom: 12px; margin-left: 5px;"
-        >
-          Remover Vacina
-        </n-button>
+      <n-form-item
+        label="Vacinas"
+        v-for="(vacina, index) in pet.vaccines"
+        :key="vacina.id"
+      >
+        <div class="vaccine-fields">
+          <n-input v-model:value="vacina.name" placeholder="Nome da vacina" />
+          <n-date-picker
+            v-model:value="vacina.date"
+            type="date"
+            placeholder="Data da vacina"
+            :disabled-date="disabledDate"
+            format="dd/MM/yyyy"
+            value-format="timestamp"
+          />
+          <n-button
+            type="error"
+            size="small"
+            @click="removeVaccine(index)"
+            class="remove-btn"
+          >
+            Remover Vacina
+          </n-button>
+        </div>
       </n-form-item>
 
       <n-button type="dashed" size="small" @click="addVaccine">Adicionar Vacina</n-button>
@@ -57,95 +57,141 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { NButton, NCard, NForm, NFormItem, NInput, NSelect, NInputNumber, NDatePicker, NRow, NCol, NSpace } from 'naive-ui';
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
-const route = useRoute();
-const router = useRouter();
+interface Vaccine {
+  id: number
+  name: string
+  date: number | null  // timestamp ou null
+}
 
-// Dados do pet
-const pet = ref({
+interface Pet {
+  id: number
+  name: string
+  species: string
+  age: number
+  vaccines: Vaccine[]
+}
+
+const route = useRoute()
+const router = useRouter()
+
+const pet = ref<Pet>({
   id: 0,
   name: '',
   species: '',
   age: 0,
   vaccines: [
-    { id: 1, name: 'Vacina Raiva', date: '2024-01-10' },
-    { id: 2, name: 'Vacina V8', date: '2023-05-15' }
+    { id: 1, name: 'Vacina Raiva', date: null },
+    { id: 2, name: 'Vacina V8', date: null }
   ]
-});
+})
 
 const speciesOptions = [
   { label: 'Cachorro', value: 'Cachorro' },
   { label: 'Gato', value: 'Gato' },
   { label: 'Outro', value: 'Outro' }
-];
+]
 
 // Função para desabilitar datas passadas
 function disabledDate(current: Date): boolean {
-  return current && current < new Date();
+  return current && current < new Date()
 }
 
-// Carregar dados do pet quando a página for carregada
 onMounted(() => {
-  const petId = Number(route.params.id); // O id do pet é obtido pela rota
-  // Exemplo fictício de dados:
+  const petId = Number(route.params.id)
+  // Simulando carregamento de dados — aqui você pode puxar da API, por ex.
   pet.value = {
     id: petId,
     name: 'Rex',
     species: 'Cachorro',
     age: 4,
     vaccines: [
-      { id: 1, name: 'Vacina Raiva', date: '2024-01-10' },
-      { id: 2, name: 'Vacina V8', date: '2022-03-15' }
+      { id: 1, name: 'Vacina Raiva', date: new Date('2024-01-10').getTime() },
+      { id: 2, name: 'Vacina V8', date: new Date('2022-03-15').getTime() }
     ]
-  };
-
-  // Converte datas para objetos Date, assim o NDatePicker consegue exibir corretamente
-  pet.value.vaccines.forEach(v => {
-    if (v.date) v.date = new Date(v.date);
-  });
-});
+  }
+})
 
 // Adicionar nova vacina
 function addVaccine() {
-  const newVaccine = { id: Date.now(), name: '', date: null };
-  pet.value.vaccines.push(newVaccine);
+  const newVaccine: Vaccine = { id: Date.now(), name: '', date: null }
+  pet.value.vaccines.push(newVaccine)
 }
 
 // Remover vacina
 function removeVaccine(index: number) {
-  pet.value.vaccines.splice(index, 1);
+  pet.value.vaccines.splice(index, 1)
 }
 
-// Função de salvar pet
+// Salvar pet (simulado)
 function savePet() {
-  console.log('Salvando pet:', pet.value);
-  router.push('/pets');
+  console.log('Salvando pet:', pet.value)
+  router.push('/pets')
 }
 
-// Função para voltar à lista de pets
+// Voltar para lista
 function goBack() {
-  router.push('/pets');
+  router.push('/pets')
 }
 </script>
 
 <style scoped>
-n-card {
-  max-width: 600px;
-  margin: 20px auto;
+.vaccine-fields {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-start;
 }
 
-n-form-item {
-  margin-bottom: 10px;
+.vaccine-fields > * {
+  flex: 1 1 200px;
+  min-width: 120px;
 }
 
-n-button {
-  margin-top: 10px;
-}
+/* Mobile */
+@media (max-width: 600px) {
+  n-card {
+    max-width: 100%;
+    margin: 10px;
+    padding: 10px;
+  }
 
-.n-button-error {
-  margin-top: 10px;
+  .vaccine-fields {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .vaccine-fields > * {
+    flex: 1 1 100%;
+  }
+
+  .remove-btn {
+    width: 100%;
+    height: auto !important;
+    padding: 10px 0;
+    font-size: 14px;
+  }
+
+  n-button[type="dashed"] {
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+  }
+
+  .n-form-item {
+    width: 100%;
+  }
+
+  .n-input, .n-select, .n-input-number {
+    width: 100%;
+  }
+
+  n-button {
+    width: 100%;
+    font-size: 14px;
+    padding: 12px;
+  }
 }
 </style>

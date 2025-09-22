@@ -6,9 +6,7 @@
         <li v-for="vacina in overdueVaccines" :key="vacina.id" class="vaccine-item">
           <span class="vaccine-name">{{ vacina.name }}</span>  
           <span class="vaccine-date">{{ formatDateBR(vacina.date) }}</span> 
-          <span class="vaccine-status" style="color: red;">
-            Atrasada
-          </span>
+          <span class="vaccine-status red">Atrasada</span>
         </li>
       </ul>
       
@@ -17,9 +15,7 @@
         <li v-for="vacina in inDateVaccines" :key="vacina.id" class="vaccine-item">
           <span class="vaccine-name">{{ vacina.name }}</span>  
           <span class="vaccine-date">{{ formatDateBR(vacina.date) }}</span>  
-          <span class="vaccine-status" style="color: green;">
-            Em Dia
-          </span>
+          <span class="vaccine-status green">Em Dia</span>
         </li>
       </ul>
       
@@ -27,37 +23,36 @@
       <ul class="vaccines-list">
         <li v-for="vacina in necessaryVaccines" :key="vacina.name" class="vaccine-item">
           <span class="vaccine-name">{{ vacina.name }}</span>  
-          <span class="vaccine-status" style="color: orange;">
-            Necessária
-          </span>
+          <span class="vaccine-status orange">Necessária</span>
         </li>
       </ul>
     </div>
 
-    <n-button @click="goBack" class="back-button">Voltar</n-button>
+    <div class="back-btn-wrapper">
+      <n-button @click="goBack" type="primary">Voltar</n-button>
+    </div>
   </n-card>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 interface Vaccine {
-  id: number;
-  name: string;
-  date: string; // formato 'YYYY-MM-DD'
+  id: number
+  name: string
+  date: string
 }
-
 interface Pet {
-  id: number;
-  name: string;
-  species: string;
-  age: number;
-  vaccines: Vaccine[];
+  id: number
+  name: string
+  species: string
+  age: number
+  vaccines: Vaccine[]
 }
 
-const route = useRoute();
-const router = useRouter();
+const route = useRoute()
+const router = useRouter()
 
 const pet = ref<Pet>({
   id: 0,
@@ -65,12 +60,10 @@ const pet = ref<Pet>({
   species: '',
   age: 0,
   vaccines: []
-});
+})
 
-// Simulação de dados
 onMounted(() => {
-  const petId = Number(route.params.id);
-  // Simulação de dados do pet
+  const petId = Number(route.params.id)
   pet.value = {
     id: petId,
     name: petId === 1 ? 'Rex' : 'Mimi',
@@ -79,59 +72,50 @@ onMounted(() => {
     vaccines: [
       { id: 1, name: 'Vacina Raiva', date: '2025-01-10' },
       { id: 2, name: 'Vacina V8', date: '2022-03-15' },
-      { id: 3, name: 'Vacina Parvovirose', date: '2023-04-01' } // Exemplo de vacina em dia
+      { id: 3, name: 'Vacina Parvovirose', date: '2023-04-01' }
     ]
-  };
-});
+  }
+})
 
-// Função que retorna se a vacina está atrasada (mais de 365 dias)
 function isVaccineLate(vacDate: string): boolean {
-  const dateVaccine = new Date(vacDate);
-  const now = new Date();
-  const diffTime = now.getTime() - dateVaccine.getTime();
-  const diffDays = diffTime / (1000 * 3600 * 24);
-  return diffDays > 365; // mais de 365 dias = atrasada
+  const dateVaccine = new Date(vacDate)
+  const now = new Date()
+  const diffTime = now.getTime() - dateVaccine.getTime()
+  const diffDays = diffTime / (1000 * 3600 * 24)
+  return diffDays > 365
 }
 
 function formatDateBR(dateStr: string): string {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0'); // mês começa do 0
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`
 }
 
+const overdueVaccines = computed(() =>
+  pet.value.vaccines.filter(v => isVaccineLate(v.date))
+)
+const inDateVaccines = computed(() =>
+  pet.value.vaccines.filter(v => !isVaccineLate(v.date))
+)
 
-// Filtrando as vacinas
-const overdueVaccines = computed(() => {
-  return pet.value.vaccines.filter(vacina => isVaccineLate(vacina.date));
-});
-
-const inDateVaccines = computed(() => {
-  return pet.value.vaccines.filter(vacina => !isVaccineLate(vacina.date));
-});
-
-// Vacinas necessárias dependendo do tipo de animal
 const necessaryVaccines = computed(() => {
   if (pet.value.species === 'Cachorro') {
     return [
       { name: 'Vacina Raiva' },
       { name: 'Vacina V8' },
-      { name: 'Vacina Parvovirose' },
-    ];
+      { name: 'Vacina Parvovirose' }
+    ]
   } else if (pet.value.species === 'Gato') {
     return [
       { name: 'Vacina V3' },
-      { name: 'Vacina Leucemia Felina' },
-    ];
+      { name: 'Vacina Leucemia Felina' }
+    ]
   }
-  return [];
-});
+  return []
+})
 
-// Função de voltar
 function goBack() {
-  router.back();
+  router.back()
 }
 </script>
 
@@ -151,12 +135,12 @@ function goBack() {
 
 .vaccines-section h3 {
   font-size: 20px;
-  margin-bottom: 15px;
-  color: #222b22ff;
+  margin: 15px 0 10px;
+  color: #222;
 }
 
 .vaccines-list {
-  list-style-type: none;
+  list-style: none;
   padding: 0;
   margin: 0;
 }
@@ -167,6 +151,8 @@ function goBack() {
   margin-bottom: 10px;
   font-size: 16px;
   color: #555;
+  border-bottom: 1px solid #eee;
+  padding: 6px 0;
 }
 
 .vaccine-name {
@@ -181,31 +167,31 @@ function goBack() {
 .vaccine-status {
   font-weight: bold;
 }
+.vaccine-status.green { color: green; }
+.vaccine-status.red { color: rgb(230, 34, 34); }
+.vaccine-status.orange { color: orange; }
 
-.vaccine-status.green {
-  color: green;
-}
-
-.vaccine-status.red {
-  color: red;
-}
-
-.vaccine-status.orange {
-  color: orange;
-}
-
-.back-button {
+/* Botão voltar */
+.back-btn-wrapper {
   margin-top: 20px;
-  background-color: #4CAF50;
-  color: white;
-  font-size: 16px;
-  border: none;
-  border-radius: 4px;
-  padding: 10px 20px;
-  cursor: pointer;
+  text-align: right;
 }
+@media (max-width: 768px) {
+  .back-btn-wrapper {
+    text-align: center;
+  }
 
-.back-button:hover {
-  background-color: #45a049;
+  /* Itens de vacina em coluna no mobile */
+  .vaccine-item {
+    flex-direction: column;
+    align-items: flex-start;
+    font-size: 14px;
+  }
+
+  .vaccine-name,
+  .vaccine-date,
+  .vaccine-status {
+    margin: 2px 0;
+  }
 }
 </style>

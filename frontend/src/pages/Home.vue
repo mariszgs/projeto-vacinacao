@@ -7,50 +7,78 @@
       v-if="overdueVaccines > 0"
       type="warning"
       show-icon
-      style="margin-top: 24px;"
-      title="Existem pets com vacinas atrasadas. Verifique a lista de pets."
+      style="margin-top: 16px;"
+      title="Existem pets com vacinas atrasadas. Verifique a lista abaixo."
     />
 
-    <!-- Calendário de Vacinação -->
-    <n-card
-      title="Calendário de Vacinação"
-      bordered
-      style="margin-top: 24px;"
+    <!-- Estatísticas rápidas -->
+    <n-grid
+      cols="3"
+      x-gap="12"
+      y-gap="12"
+      responsive="screen"
+      style="margin-top: 16px;"
     >
-      <n-calendar
-        v-model:value="calendarDate"
-        :show-time="true"
-        @update:value="handleCalendarChange"
-        :locale="naiveLocale"
-        :formatter="formatter"
-      />
+      <n-gi span="3 s:1 m:1 l:1">
+        <n-card title="Total de Pets" bordered>
+          <n-statistic :value="totalPets" />
+        </n-card>
+      </n-gi>
+
+      <n-gi span="3 s:1 m:1 l:1">
+        <n-card title="Vacinas Aplicadas" bordered>
+          <n-statistic :value="totalVaccines" />
+        </n-card>
+      </n-gi>
+
+      <n-gi span="3 s:1 m:1 l:1">
+        <n-card title="Vacinas Atrasadas" bordered>
+          <n-statistic :value="overdueVaccines" />
+        </n-card>
+      </n-gi>
+    </n-grid>
+
+    <!-- Lista de pets com vacinas atrasadas -->
+    <n-card title="Pets com Vacinas Atrasadas" style="margin-top: 16px;">
+      <n-list bordered>
+        <n-list-item v-for="pet in overduePets" :key="pet.id">
+          <div style="display: flex; justify-content: space-between; width: 100%;">
+            <span><strong>{{ pet.name }}</strong></span>
+            <span style="color: red;">{{ pet.vaccine }} - {{ pet.date }}</span>
+          </div>
+        </n-list-item>
+      </n-list>
+      <n-button
+        type="primary"
+        tertiary
+        block
+        style="margin-top: 12px;"
+        @click="goToPetsPage"
+      >
+        Ver todos os pets
+      </n-button>
     </n-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { ptBR as naiveLocale } from "naive-ui";
-import { ptBR } from "date-fns/locale/pt-BR";
-import { format } from "date-fns";
+import { ref } from "vue"
+import { useRouter } from "vue-router"
 
 // Dados simulados
-const overdueVaccines = ref(3);
+const totalPets = ref(120)
+const totalVaccines = ref(350)
+const overdueVaccines = ref(3)
 
-// Timestamp
-const calendarDate = ref(Date.now());
+const overduePets = ref([
+  { id: 1, name: "Rex", vaccine: "Antirrábica", date: "05/09/2025" },
+  { id: 2, name: "Luna", vaccine: "V8", date: "10/09/2025" },
+  { id: 3, name: "Thor", vaccine: "Giárdia", date: "15/09/2025" }
+])
 
-// Traduzindo o calendário
-const formatter = {
-  title: (date: Date) => format(new Date(date), "MMMM yyyy", { locale: ptBR }),
-  weekday: (date: Date) => format(new Date(date), "EEE", { locale: ptBR }),
-  day: (date: Date) => format(new Date(date), "d", { locale: ptBR })
-};
+const router = useRouter()
 
-function handleCalendarChange(timestamp: number) {
-  const dataFormatada = format(new Date(timestamp), "dd/MM/yyyy", {
-    locale: ptBR
-  });
-  console.log("Data selecionada:", dataFormatada);
+const goToPetsPage = () => {
+  router.push("/pets")
 }
 </script>

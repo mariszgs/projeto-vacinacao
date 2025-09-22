@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router';
+import { RouterView } from 'vue-router'
+import { NConfigProvider } from 'naive-ui'
 </script>
 
 <template>
+  <n-config-provider>
     <RouterView />
+  </n-config-provider>
 </template>
 
 <style scoped>
-/* colocar estilos globais leves aqui */
+/* estilos globais leves */
 body {
   font-family: 'Inter', sans-serif;
   margin: 0;
