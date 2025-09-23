@@ -88,7 +88,7 @@ function toggleRegister() {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  min-height: 94vh;
   background-color: #f5f5f5;
   padding: 20px;
 }
