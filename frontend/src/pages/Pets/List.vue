@@ -40,9 +40,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, h } from "vue";
+import { ref, onMounted, h } from "vue";
 import { useRouter } from "vue-router";
-import { NButton } from "naive-ui";
+import axios from "axios";
+import { NButton, useMessage } from "naive-ui";
+
+const message = useMessage();
+const router = useRouter();
 
 interface Pet {
   id: number;
@@ -51,13 +55,59 @@ interface Pet {
   age: number;
 }
 
-const router = useRouter();
+const pets = ref<Pet[]>([]);
 
-const pets = ref<Pet[]>([
-  { id: 1, name: "Rex", species: "Cachorro", age: 4 },
-  { id: 2, name: "Mimi", species: "Gato", age: 2 }
-]);
+// Axios com header Authorization
+const api = axios.create({
+  baseURL: "http://localhost:8000/api",
+  headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  },
+});
 
+// Buscar pets do backend
+async function fetchPets() {
+  try {
+    const response = await api.get("/pets");
+    // Calcular idade com base na birthdate se quiser
+    pets.value = response.data.map((pet: any) => ({
+      ...pet,
+      age: calcularIdade(pet.birthdate),
+    }));
+  } catch (error) {
+    console.error("Erro ao buscar pets:", error);
+    message.error("Erro ao carregar pets.");
+  }
+}
+
+// Calcular idade baseado na data de nascimento
+function calcularIdade(dataNascimento: string | null): number {
+  if (!dataNascimento) return 0;
+  const nascimento = new Date(dataNascimento);
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+  const m = hoje.getMonth() - nascimento.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) {
+    idade--;
+  }
+  return idade;
+}
+
+// Excluir pet
+async function goToDelete(id: number) {
+  if (confirm("Tem certeza que deseja excluir este pet?")) {
+    try {
+      const response = await api.delete(`/pets/${id}`);
+      pets.value = pets.value.filter((pet) => pet.id !== id);
+      message.success(response.data.message || "Pet excluído com sucesso!");
+    } catch (error) {
+      console.error("Erro ao excluir pet:", error);
+      message.error("Erro ao excluir pet.");
+    }
+  }
+}
+
+// Navegação
 function goToCreate() {
   router.push("/pets/create");
 }
@@ -67,17 +117,11 @@ function goToView(id: number) {
 function goToEdit(id: number) {
   router.push(`/pets/edit/${id}`);
 }
-function goToDelete(id: number) {
-  if (confirm("Tem certeza que deseja excluir este pet?")) {
-    pets.value = pets.value.filter((pet) => pet.id !== id);
-    console.log(`Pet com ID ${id} excluído`);
-  }
-}
 function goToSchedule(id: number) {
   router.push(`/schedule/${id}`);
 }
 
-// Colunas da tabela (só para desktop)
+// Tabela (desktop)
 const columns = [
   { title: "ID", key: "id" },
   { title: "Nome", key: "name" },
@@ -108,7 +152,7 @@ const columns = [
           ),
           h(
             NButton,
-            { size: "small", onClick: () => goToDelete(row.id) },
+            { size: "small", type: "error", onClick: () => goToDelete(row.id) },
             { default: () => "Excluir" }
           )
         ]
@@ -116,6 +160,9 @@ const columns = [
     }
   }
 ];
+
+// Carrega os pets ao montar o componente
+onMounted(fetchPets);
 </script>
 
 <style scoped>

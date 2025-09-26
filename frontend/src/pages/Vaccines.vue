@@ -1,128 +1,101 @@
 <template>
   <n-card title="Lista de Vacinas">
-    <!-- Botão adicionar -->
     <div class="add-btn-wrapper">
       <n-button type="primary" @click="goToCreate">
         Adicionar Nova Vacina
       </n-button>
     </div>
 
-    <!-- Desktop: tabela -->
-    <div class="desktop-table">
-      <n-data-table
-        :columns="columns"
-        :data="vaccines"
-        :scroll="{ x: 'max-content' }"
-        style="margin-top: 24px;"
-      />
-    </div>
+    <n-spin :show="loading">
+      <n-alert v-if="error" type="error" closable>
+        {{ error }}
+      </n-alert>
 
-    <!-- Mobile: cards -->
-    <div class="mobile-list">
-      <n-card
-        v-for="vaccine in vaccines"
-        :key="vaccine.id"
-        style="margin-bottom: 12px;"
-        :title="vaccine.name"
-      >
-        <p><strong>Descrição:</strong> {{ vaccine.description }}</p>
-        <p><strong>Obrigatória:</strong> {{ vaccine.isMandatory ? 'Sim' : 'Não' }}</p>
-        <p><strong>Última Aplicação:</strong> {{ formatDateBR(vaccine.lastApplied) }}</p>
-        <p><strong>Data de Validade:</strong> {{ formatDateBR(vaccine.validUntil) }}</p>
-        <p><strong>Intervalo:</strong> {{ vaccine.applicationInterval }}</p>
-        <p><strong>Status:</strong> {{ vaccine.status }}</p>
-      </n-card>
-    </div>
+      <!-- Desktop -->
+      <div class="desktop-table">
+        <n-data-table
+          :columns="columns"
+          :data="vaccines"
+          :scroll="{ x: 'max-content' }"
+          style="margin-top: 24px;"
+        />
+      </div>
+
+      <!-- Mobile -->
+      <div class="mobile-list">
+        <n-card
+          v-for="vaccine in vaccines"
+          :key="vaccine.id"
+          :title="vaccine.nome"
+          style="margin-bottom: 12px;"
+        >
+          <p><strong>Descrição:</strong> {{ vaccine.descricao }}</p>
+          <p><strong>Validade (dias):</strong> {{ vaccine.validade_dias ?? 'Não informada' }}</p>
+        </n-card>
+      </div>
+    </n-spin>
   </n-card>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
+import { api } from "@/api"; // ✅ usando axios centralizado
 
 const router = useRouter();
 
 interface Vaccine {
   id: number;
-  name: string;
-  description: string;
-  validUntil: string; // 🔁 era createdAt
-  isMandatory: boolean;
-  lastApplied: string;
-  applicationInterval: string;
-  status: string;
+  nome: string;
+  descricao: string;
+  validade_dias: number | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
-function formatDateBR(dateStr: string): string {
-  if (!dateStr) return "";
-  const date = new Date(dateStr);
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+const vaccines = ref<Vaccine[]>([]);
+const loading = ref(false);
+const error = ref<string | null>(null);
+
+// Carrega vacinas da API
+async function fetchVaccines() {
+  loading.value = true;
+  error.value = null;
+
+  try {
+    const response = await api.get("/vacinas");
+    vaccines.value = response.data;
+  } catch (err: any) {
+    console.error("Erro ao buscar vacinas:", err);
+    if (err.response?.status === 401) {
+      error.value = "Não autorizado. Faça login para continuar.";
+    } else {
+      error.value = "Erro ao buscar vacinas. Tente novamente mais tarde.";
+    }
+  } finally {
+    loading.value = false;
+  }
 }
+
+onMounted(() => {
+  fetchVaccines();
+});
 
 function goToCreate() {
   router.push("/vaccines/create");
 }
 
-const vaccines = ref<Vaccine[]>([
-  {
-    id: 1,
-    name: "Vacina Raiva",
-    description: "Prevenção contra a raiva em cães e gatos.",
-    validUntil: "2026-01-01", // 🔁 era createdAt
-    isMandatory: true,
-    lastApplied: "2023-01-15",
-    applicationInterval: "1 ano",
-    status: "Em circulação",
-  },
-  {
-    id: 2,
-    name: "Vacina V8",
-    description: "Protege contra 8 doenças em cães.",
-    validUntil: "2025-03-10",
-    isMandatory: true,
-    lastApplied: "2022-12-20",
-    applicationInterval: "1 ano",
-    status: "Em circulação",
-  },
-  {
-    id: 3,
-    name: "Vacina V3",
-    description: "Vacina para gatos que previne várias doenças.",
-    validUntil: "2025-05-30",
-    isMandatory: false,
-    lastApplied: "2022-09-12",
-    applicationInterval: "1 ano",
-    status: "Em circulação",
-  },
-]);
-
 // Tabela para desktop
 const columns = [
   { title: "ID", key: "id" },
-  { title: "Nome", key: "name" },
-  { title: "Descrição", key: "description" },
+  { title: "Nome", key: "nome" },
+  { title: "Descrição", key: "descricao" },
   {
-    title: "Data de Validade", // 🔁 era "Data de Criação"
-    key: "validUntil",
-    render: (row: Vaccine) => formatDateBR(row.validUntil),
+    title: "Validade (dias)",
+    key: "validade_dias",
+    render: (row: Vaccine) => row.validade_dias ?? "Não informado",
   },
-  {
-    title: "Obrigatória",
-    key: "isMandatory",
-    render: (row: Vaccine) => (row.isMandatory ? "Sim" : "Não"),
-  },
-  {
-    title: "Última Aplicação",
-    key: "lastApplied",
-    render: (row: Vaccine) => formatDateBR(row.lastApplied),
-  },
-  { title: "Intervalo de Aplicação", key: "applicationInterval" },
-  { title: "Status", key: "status" },
 ];
-
 </script>
 
 <style scoped>
@@ -153,3 +126,4 @@ const columns = [
   }
 }
 </style>
+      

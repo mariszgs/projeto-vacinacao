@@ -4,9 +4,9 @@
       <!-- Formulário de Login -->
       <div v-if="!isRegistering" class="form-column">
         <n-form :model="form" @submit="handleLogin">
-          <n-form-item label="Usuário">
-            <n-input v-model:value="form.username" placeholder="Digite seu nome de usuário" />
-          </n-form-item>
+          <n-form-item label="Email">
+  <n-input v-model:value="form.email" placeholder="Digite seu email" />
+</n-form-item>
           <n-form-item label="Senha">
             <n-input type="password" v-model:value="form.password" placeholder="Digite sua senha" />
           </n-form-item>
@@ -22,11 +22,14 @@
           <n-form-item label="Nome">
             <n-input v-model:value="registerForm.name" placeholder="Digite seu nome completo" />
           </n-form-item>
-          <n-form-item label="Usuário">
-            <n-input v-model:value="registerForm.username" placeholder="Escolha um nome de usuário" />
+          <n-form-item label="Email">
+            <n-input v-model:value="registerForm.email" placeholder="Digite seu email" />
           </n-form-item>
           <n-form-item label="Senha">
             <n-input type="password" v-model:value="registerForm.password" placeholder="Escolha uma senha" />
+          </n-form-item>
+          <n-form-item label="Confirmar Senha">
+            <n-input type="password" v-model:value="registerForm.password_confirmation" placeholder="Confirme sua senha" />
           </n-form-item>
           <n-button type="primary" block @click="handleRegister">Cadastrar</n-button>
           <n-divider>Já tem uma conta?</n-divider>
@@ -39,13 +42,15 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { NCard, NForm, NFormItem, NInput, NButton, NDivider } from 'naive-ui';
+import { NCard, NForm, NFormItem, NInput, NButton, NDivider, useMessage } from 'naive-ui';
 import { useRouter } from 'vue-router';
+import axios from 'axios';
 
 const router = useRouter();
+const message = useMessage();
 
 const form = ref({
-  username: '',
+  email: '',
   password: ''
 });
 
@@ -53,34 +58,56 @@ const isRegistering = ref(false);
 
 const registerForm = ref({
   name: '',
-  username: '',
-  password: ''
+  email: '',
+  password: '',
+  password_confirmation: ''
 });
 
-function handleLogin() {
-  console.log('Login com', form.value);
-  
-  // Simulação de login bem-sucedido, redireciona para o Dashboard
-  // Aqui você pode substituir pelo seu processo de autenticação real
-  if (form.value.username && form.value.password) {
+async function handleLogin() {
+  try {
+    const response = await axios.post('http://localhost:8000/api/login', {
+      email: form.value.email,
+      password: form.value.password
+    });
+
+    // Salvando o token
+    localStorage.setItem('token', response.data.access_token);
+
+    message.success('Login realizado com sucesso!');
     router.push('/home');
+  } catch (error) {
+    console.error(error);
+    message.error('Credenciais inválidas ou erro no servidor.');
   }
 }
 
-function handleRegister() {
-  console.log('Registro com', registerForm.value);
+async function handleRegister() {
+  try {
+    const response = await axios.post('http://localhost:8000/api/register', {
+      name: registerForm.value.name,
+      email: registerForm.value.email,
+      password: registerForm.value.password,
+      password_confirmation: registerForm.value.password_confirmation
+    });
 
-  // Simulação de registro bem-sucedido, redireciona para o Dashboard
-  // Aqui você pode substituir pelo seu processo de registro real
-  if (registerForm.value.username && registerForm.value.password && registerForm.value.name) {
-    router.push('/home');
+    message.success('Cadastro realizado com sucesso! Faça login.');
+    toggleRegister();
+  } catch (error: any) {
+    console.error(error);
+    if (error.response?.data?.errors) {
+      const firstError = Object.values(error.response.data.errors)[0];
+      message.error(firstError as string);
+    } else {
+      message.error('Erro ao registrar usuário.');
+    }
   }
 }
 
 function toggleRegister() {
-  isRegistering.value = !isRegistering.value; // Alterna entre o login e o registro
+  isRegistering.value = !isRegistering.value;
 }
 </script>
+
 
 <style scoped>
 /* Centralizar o conteúdo da tela */
@@ -88,7 +115,7 @@ function toggleRegister() {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  min-height: 94vh;
   background-color: #f5f5f5;
   padding: 20px;
 }

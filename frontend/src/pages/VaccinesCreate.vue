@@ -18,6 +18,7 @@
         <n-date-picker
           v-model:value="form.expirationDate"
           type="date"
+          value-format="timestamp"
           placeholder="Selecione a data de validade"
           :disabled-date="disablePastDates"
           style="width: 100%"
@@ -37,15 +38,17 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import type { FormInst } from 'naive-ui'
+import axios from 'axios'
+import { useMessage, type FormInst } from 'naive-ui'
 
 const router = useRouter()
+const message = useMessage()
 const formRef = ref<FormInst | null>(null)
 
 const form = reactive({
   name: '',
   description: '',
-  expirationDate: null as Date | null
+  expirationDate: null as number | null // <- TIMESTAMP
 })
 
 const rules = {
@@ -55,9 +58,9 @@ const rules = {
   description: [
     { required: true, message: 'A descrição é obrigatória', trigger: 'blur' }
   ],
-  expirationDate: [
-    { required: true, message: 'A data de validade é obrigatória', trigger: 'blur' }
-  ]
+ // expirationDate: [
+ //   { required: true, message: 'A data de validade é obrigatória', trigger: ['change', 'blur'] }
+ // ]
 }
 
 function disablePastDates(date: Date) {
@@ -71,16 +74,39 @@ async function submitForm() {
 
   try {
     await formRef.value.validate()
-    alert(`Vacina "${form.name}" salva com sucesso!\nData de validade: ${form.expirationDate?.toLocaleDateString()}`)
-    
-    // TODO: Enviar dados para o backend aqui
 
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Normaliza para comparar só data, sem hora
+
+    const expirationTimestamp = form.expirationDate // Já é um número (timestamp)
+    const expirationDate = expirationTimestamp ? new Date(expirationTimestamp) : null
+
+    // Calcular a diferença de dias entre a data de validade e a data de hoje
+    const validadeDias = expirationTimestamp
+      ? Math.floor((expirationTimestamp - today.getTime()) / (1000 * 3600 * 24))
+      : null
+
+    const payload: any = {
+  nome: form.name,
+  descricao: form.description,
+}
+
+if (expirationTimestamp != null) {
+  payload.validade_dias = Math.floor((expirationTimestamp - today.getTime()) / (1000 * 3600 * 24))
+}
+
+
+    await axios.post('http://localhost:8000/api/vacinas', payload)
+
+    message.success(`Vacina "${form.name}" salva com sucesso!`)
     cancel()
-  } catch (errors) {
-    console.warn('Formulário inválido:', errors)
-    // Erros são exibidos automaticamente pelo Naive UI
+  } catch (error) {
+    console.error('Erro ao salvar vacina:', error)
+    message.error('Erro ao salvar vacina.')
   }
 }
+
+
 
 function cancel() {
   router.push('/vaccines')
@@ -103,7 +129,6 @@ function cancel() {
     padding: 16px;
   }
 
-  /* Inputs, textarea e datepicker ocupam 100% na tela pequena */
   .add-vaccine-card ::v-deep input,
   .add-vaccine-card ::v-deep textarea,
   .add-vaccine-card ::v-deep .n-date-picker {

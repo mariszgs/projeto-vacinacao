@@ -13,10 +13,18 @@
         />
       </n-form-item>
 
-      <n-form-item label="Idade" path="age">
-        <n-input-number v-model:value="form.age" :min="0" />
+      <n-form-item label="Data de Nascimento" path="birthdate">
+        <n-date-picker
+          v-model:value="form.birthdate"
+          type="date"
+          format="dd/MM/yyyy"
+          value-format="yyyy-MM-dd"
+          placeholder="Selecione a data de nascimento"
+          :disabled-date="disabledDateNascimento"
+        />
       </n-form-item>
 
+      <!-- VACINAS (mantido, mas não enviado pro backend ainda) -->
       <n-form-item label="Vacinas Tomadas" path="vaccinesTaken">
         <n-select
           v-model:value="form.vaccinesTaken"
@@ -55,7 +63,7 @@
 
       <div v-for="(vaccine, index) in form.vaccinesToTake" :key="'toTake-' + index">
         <n-form-item
-          :label="'Data da Última ' + vaccine + ' Tomada'"
+          :label="'Data de Agendamento para ' + vaccine"
           :path="'vaccinesToTakeDates[' + index + ']'"
         >
           <n-date-picker
@@ -82,15 +90,18 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import type { FormInst } from 'naive-ui'; // ✅ importação como tipo
+import { useMessage } from 'naive-ui';
+import axios from 'axios';
+import type { FormInst } from 'naive-ui';
 
 const router = useRouter();
+const message = useMessage();
 const formRef = ref<FormInst | null>(null);
 
 const form = reactive({
   name: '',
   species: '',
-  age: null as number | null,
+  birthdate: null as string | null,
   vaccinesTaken: [] as string[],
   vaccinesTakenDates: [] as (string | null)[],
   vaccinesToTake: [] as string[],
@@ -112,50 +123,25 @@ const vaccinesOptions = [
 ];
 
 const rules = {
-  name: [
-    { required: true, message: 'Nome é obrigatório', trigger: 'blur' },
-    { min: 2, message: 'Nome deve ter no mínimo 2 caracteres', trigger: 'blur' }
-  ],
-  species: [
-    { required: true, message: 'Espécie é obrigatória', trigger: 'change' }
-  ],
-  age: [
-    { required: true, message: 'Idade é obrigatória', trigger: 'change' },
-    { type: 'number', min: 0, message: 'Idade deve ser 0 ou mais', trigger: 'change' }
-  ],
-  vaccinesTaken: [
-    { required: true, message: 'Vacinas tomadas são obrigatórias', trigger: 'change' }
-  ],
-  vaccinesTakenDates: [
-    { required: true, message: 'Data das vacinas tomadas é obrigatória', trigger: 'change' }
-  ],
-  vaccinesToTake: [
-    { required: true, message: 'Vacinas a tomar são obrigatórias', trigger: 'change' }
-  ],
-  vaccinesToTakeDates: [
-    { required: true, message: 'Data das vacinas a tomar é obrigatória', trigger: 'change' }
-  ]
+  name: [{ required: true, message: 'Nome é obrigatório', trigger: 'blur' }],
+  species: [{ required: true, message: 'Espécie é obrigatória', trigger: 'change' }],
+  birthdate: [{ required: true, message: 'Data de nascimento é obrigatória', trigger: 'change' }]
 };
 
 function disabledDate(current: Date): boolean {
   return current && current < new Date();
 }
 
-function handleVaccinesTakenChange(selectedVaccines: string[]) {
-  form.vaccinesTakenDates = new Array(selectedVaccines.length).fill(null);
+function disabledDateNascimento(current: Date): boolean {
+  return current.getTime() > Date.now();
 }
 
-function handleVaccinesToTakeChange(selectedVaccines: string[]) {
-  form.vaccinesToTakeDates = new Array(selectedVaccines.length).fill(null);
+function handleVaccinesTakenChange(selected: string[]) {
+  form.vaccinesTakenDates = new Array(selected.length).fill(null);
 }
 
-function formatDateBR(dateStr: string | null) {
-  if (!dateStr) return null;
-  const date = new Date(dateStr);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+function handleVaccinesToTakeChange(selected: string[]) {
+  form.vaccinesToTakeDates = new Array(selected.length).fill(null);
 }
 
 async function submitForm() {
@@ -164,17 +150,35 @@ async function submitForm() {
   try {
     await formRef.value.validate();
 
-    const formData = {
-      ...form,
-      vaccinesTakenDates: form.vaccinesTakenDates.map(formatDateBR),
-      vaccinesToTakeDates: form.vaccinesToTakeDates.map(formatDateBR)
+    const token = localStorage.getItem('token');
+    if (!token) {
+      message.error("Você precisa estar autenticado.");
+      return;
+    }
+
+    const payload = {
+      name: form.name,
+      species: form.species,
+      breed: null, // pode remover se não usa
+      birthdate: form.birthdate
     };
 
-    console.log('Pet cadastrado com sucesso:', formData);
+    await axios.post('http://localhost:8000/api/pets', payload, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    message.success('Pet cadastrado com sucesso!');
     router.push('/pets');
-  } catch (errors) {
-    console.warn('Formulário inválido:', errors);
-    // Naive UI já exibe os erros nos campos, não precisa fazer mais nada aqui
+  } catch (error: any) {
+    console.error(error);
+    if (error.response?.data?.errors) {
+      const firstError = Object.values(error.response.data.errors)[0];
+      message.error(firstError as string);
+    } else {
+      message.error('Erro ao cadastrar pet.');
+    }
   }
 }
 
@@ -182,4 +186,3 @@ function cancel() {
   router.push('/pets');
 }
 </script>
-
