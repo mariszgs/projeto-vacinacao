@@ -48,7 +48,7 @@ const formRef = ref<FormInst | null>(null)
 const form = reactive({
   name: '',
   description: '',
-  expirationDate: null as number | null // <- TIMESTAMP
+  expirationDate: null as number | null // timestamp
 })
 
 const rules = {
@@ -58,9 +58,6 @@ const rules = {
   description: [
     { required: true, message: 'A descrição é obrigatória', trigger: 'blur' }
   ],
- // expirationDate: [
- //   { required: true, message: 'A data de validade é obrigatória', trigger: ['change', 'blur'] }
- // ]
 }
 
 function disablePastDates(date: Date) {
@@ -69,44 +66,53 @@ function disablePastDates(date: Date) {
   return date < today
 }
 
+// converte timestamp para YYYY-MM-DD
+function formatDateForBackend(timestamp: number) {
+  const date = new Date(timestamp)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 async function submitForm() {
   if (!formRef.value) return
 
   try {
     await formRef.value.validate()
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0) // Normaliza para comparar só data, sem hora
-
-    const expirationTimestamp = form.expirationDate // Já é um número (timestamp)
-    const expirationDate = expirationTimestamp ? new Date(expirationTimestamp) : null
-
-    // Calcular a diferença de dias entre a data de validade e a data de hoje
-    const validadeDias = expirationTimestamp
-      ? Math.floor((expirationTimestamp - today.getTime()) / (1000 * 3600 * 24))
-      : null
-
     const payload: any = {
-  nome: form.name,
-  descricao: form.description,
-}
+      nome: form.name,
+      descricao: form.description,
+    }
 
-if (expirationTimestamp != null) {
-  payload.validade_dias = Math.floor((expirationTimestamp - today.getTime()) / (1000 * 3600 * 24))
-}
+    if (form.expirationDate != null) {
+      payload.validade = formatDateForBackend(form.expirationDate) // <- mudou aqui
+    }
 
+    const token = localStorage.getItem('token')
+    if (!token) {
+      message.error('Usuário não autenticado.')
+      return
+    }
 
-    await axios.post('http://localhost:8000/api/vacinas', payload)
+    await axios.post('http://localhost:8000/api/vacinas', payload, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
 
     message.success(`Vacina "${form.name}" salva com sucesso!`)
     cancel()
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro ao salvar vacina:', error)
-    message.error('Erro ao salvar vacina.')
+    if (error.response?.status === 401) {
+      message.error('Não autorizado. Verifique seu token.')
+    } else {
+      message.error('Erro ao salvar vacina.')
+    }
   }
 }
-
-
 
 function cancel() {
   router.push('/vaccines')
@@ -121,7 +127,6 @@ function cancel() {
   box-sizing: border-box;
 }
 
-/* Responsividade e centralização */
 @media (max-width: 600px) {
   .add-vaccine-card {
     max-width: 90vw;

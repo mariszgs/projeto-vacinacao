@@ -10,6 +10,7 @@ import Profile from '../pages/Profile.vue';
 import Schedule from '../pages/Schedule.vue';
 import Vaccines from '../pages/Vaccines.vue';
 import VaccinesCreate from '../pages/VaccinesCreate.vue';
+import VaccinesEdit from '../pages/VaccinesEdit.vue';
 
 const routes = [
   {
@@ -65,6 +66,11 @@ const routes = [
         path: 'vaccines/create',
         name: 'vaccines-create',
         component: VaccinesCreate
+      },
+      {
+        path: 'vaccines/edit/:id',
+        name: 'vaccines-edit',
+        component: VaccinesEdit
       }
 
     ]

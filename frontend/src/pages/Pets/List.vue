@@ -32,15 +32,22 @@
           <n-button size="small" @click="goToView(pet.id)">Visualizar</n-button>
           <n-button size="small" @click="goToEdit(pet.id)">Editar</n-button>
           <n-button size="small" @click="goToSchedule(pet.id)">Agendar Vacinação</n-button>
-          <n-button size="small" @click="goToDelete(pet.id)">Excluir</n-button>
+          <n-button size="small" type="error" @click="goToDelete(pet.id)">Excluir</n-button>
         </n-space>
       </n-card>
+    </div>
+
+    <!-- Paginação -->
+    <div class="pagination" style="margin-top: 16px; display:flex; gap:8px; justify-content:center;">
+      <n-button size="small" @click="prevPage" :disabled="currentPage === 1">Anterior</n-button>
+      <span>Página {{ currentPage }} de {{ totalPages }}</span>
+      <n-button size="small" @click="nextPage" :disabled="currentPage === totalPages">Próxima</n-button>
     </div>
   </n-card>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, h } from "vue";
+import { ref, onMounted, h, computed } from "vue";
 import { useRouter } from "vue-router";
 import axios from "axios";
 import { NButton, useMessage } from "naive-ui";
@@ -56,6 +63,9 @@ interface Pet {
 }
 
 const pets = ref<Pet[]>([]);
+const currentPage = ref(1);
+const perPage = ref(10);
+const totalPets = ref(0);
 
 // Axios com header Authorization
 const api = axios.create({
@@ -65,15 +75,25 @@ const api = axios.create({
   },
 });
 
-// Buscar pets do backend
-async function fetchPets() {
+// Buscar pets do backend com paginação
+async function fetchPets(page = 1) {
   try {
-    const response = await api.get("/pets");
-    // Calcular idade com base na birthdate se quiser
-    pets.value = response.data.map((pet: any) => ({
+    const response = await api.get("/pets", {
+      params: { limit: perPage.value, page }
+    });
+
+    let petsArray: any[] = [];
+    if (Array.isArray(response.data.items)) {
+      petsArray = response.data.items;
+      totalPets.value = response.data.count;
+    }
+
+    pets.value = petsArray.map((pet: any) => ({
       ...pet,
       age: calcularIdade(pet.birthdate),
     }));
+
+    currentPage.value = page;
   } catch (error) {
     console.error("Erro ao buscar pets:", error);
     message.error("Erro ao carregar pets.");
@@ -135,63 +155,43 @@ const columns = [
         "div",
         { style: "display: flex; gap: 8px; flex-wrap: wrap;" },
         [
-          h(
-            NButton,
-            { size: "small", onClick: () => goToView(row.id) },
-            { default: () => "Visualizar" }
-          ),
-          h(
-            NButton,
-            { size: "small", onClick: () => goToEdit(row.id) },
-            { default: () => "Editar" }
-          ),
-          h(
-            NButton,
-            { size: "small", onClick: () => goToSchedule(row.id) },
-            { default: () => "Agendar" }
-          ),
-          h(
-            NButton,
-            { size: "small", type: "error", onClick: () => goToDelete(row.id) },
-            { default: () => "Excluir" }
-          )
+          h(NButton, { size: "small", onClick: () => goToView(row.id) }, { default: () => "Visualizar" }),
+          h(NButton, { size: "small", onClick: () => goToEdit(row.id) }, { default: () => "Editar" }),
+          h(NButton, { size: "small", onClick: () => goToSchedule(row.id) }, { default: () => "Agendar" }),
+          h(NButton, { size: "small", type: "error", onClick: () => goToDelete(row.id) }, { default: () => "Excluir" })
         ]
       );
     }
   }
 ];
 
-// Carrega os pets ao montar o componente
-onMounted(fetchPets);
+// Paginação
+const totalPages = computed(() => Math.ceil(totalPets.value / perPage.value));
+function nextPage() {
+  if (currentPage.value < totalPages.value) fetchPets(currentPage.value + 1);
+}
+function prevPage() {
+  if (currentPage.value > 1) fetchPets(currentPage.value - 1);
+}
+
+// Carrega os pets ao montar
+onMounted(() => fetchPets());
 </script>
 
 <style scoped>
-/* Botão adicionar responsivo */
 .add-btn-wrapper {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 12px;
 }
 @media (max-width: 768px) {
-  .add-btn-wrapper {
-    justify-content: center;
-  }
+  .add-btn-wrapper { justify-content: center; }
 }
 
-/* Mostrar tabela só no desktop */
-.desktop-table {
-  display: block;
-}
-.mobile-list {
-  display: none;
-}
-
+.desktop-table { display: block; }
+.mobile-list { display: none; }
 @media (max-width: 768px) {
-  .desktop-table {
-    display: none;
-  }
-  .mobile-list {
-    display: block;
-  }
+  .desktop-table { display: none; }
+  .mobile-list { display: block; }
 }
 </style>

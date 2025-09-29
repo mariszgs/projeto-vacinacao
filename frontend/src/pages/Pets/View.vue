@@ -1,31 +1,32 @@
 <template>
-  <n-card title="Vacinas do Pet" class="pet-detail-card">
-    <div class="vaccines-section">
-      <h3>Vacinas Atrasadas</h3>
-      <ul class="vaccines-list">
-        <li v-for="vacina in overdueVaccines" :key="vacina.id" class="vaccine-item">
-          <span class="vaccine-name">{{ vacina.name }}</span>  
-          <span class="vaccine-date">{{ formatDateBR(vacina.date) }}</span> 
-          <span class="vaccine-status red">Atrasada</span>
-        </li>
-      </ul>
-      
-      <h3>Vacinas em Dia</h3>
-      <ul class="vaccines-list">
-        <li v-for="vacina in inDateVaccines" :key="vacina.id" class="vaccine-item">
-          <span class="vaccine-name">{{ vacina.name }}</span>  
-          <span class="vaccine-date">{{ formatDateBR(vacina.date) }}</span>  
-          <span class="vaccine-status green">Em Dia</span>
-        </li>
-      </ul>
-      
-      <h3>Vacinas Necessárias</h3>
-      <ul class="vaccines-list">
-        <li v-for="vacina in necessaryVaccines" :key="vacina.name" class="vaccine-item">
-          <span class="vaccine-name">{{ vacina.name }}</span>  
-          <span class="vaccine-status orange">Necessária</span>
-        </li>
-      </ul>
+  <n-card title="Detalhes do Pet" class="pet-detail-card">
+    <div v-if="pet">
+      <h2>{{ pet.name }}</h2>
+      <p><strong>Espécie:</strong> {{ pet.species }}</p>
+      <p><strong>Data de Nascimento:</strong> {{ formatDateBR(pet.birthdate) }}</p>
+
+      <div class="vaccines-section" v-if="pet.vacinasAplicadas && pet.vacinasAplicadas.length">
+        <h3>Vacinas Atrasadas</h3>
+        <ul class="vaccines-list">
+          <li v-for="vacina in overdueVaccines" :key="vacina.id" class="vaccine-item">
+            <span class="vaccine-name">{{ vacina.vacina.nome }}</span>
+            <span class="vaccine-date">{{ formatDateBR(vacina.data_aplicacao) }}</span>
+            <span class="vaccine-status red">Atrasada</span>
+          </li>
+        </ul>
+
+        <h3>Vacinas em Dia</h3>
+        <ul class="vaccines-list">
+          <li v-for="vacina in inDateVaccines" :key="vacina.id" class="vaccine-item">
+            <span class="vaccine-name">{{ vacina.vacina.nome }}</span>
+            <span class="vaccine-date">{{ formatDateBR(vacina.data_aplicacao) }}</span>
+            <span class="vaccine-status green">Em Dia</span>
+          </li>
+        </ul>
+      </div>
+      <div v-else>
+        <p>Sem vacinas aplicadas.</p>
+      </div>
     </div>
 
     <div class="back-btn-wrapper">
@@ -37,86 +38,70 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
 
-interface Vaccine {
+interface VacinaAplicada {
   id: number
-  name: string
-  date: string
+  vacina: { id: number; nome: string }
+  data_aplicacao: string
+  data_proxima_dose?: string | null
 }
+
 interface Pet {
   id: number
   name: string
   species: string
-  age: number
-  vaccines: Vaccine[]
+  birthdate: string
+  vacinasAplicadas: VacinaAplicada[]
 }
 
 const route = useRoute()
 const router = useRouter()
+const pet = ref<Pet | null>(null)
 
-const pet = ref<Pet>({
-  id: 0,
-  name: '',
-  species: '',
-  age: 0,
-  vaccines: []
-})
+// Buscar dados do pet
+async function fetchPet() {
+  try {
+    const petId = Number(route.params.id)
+    const token = localStorage.getItem('token') || ''
+    const response = await axios.get(`http://localhost:8000/api/pets/${petId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
 
-onMounted(() => {
-  const petId = Number(route.params.id)
-  pet.value = {
-    id: petId,
-    name: petId === 1 ? 'Rex' : 'Mimi',
-    species: petId === 1 ? 'Cachorro' : 'Gato',
-    age: petId === 1 ? 4 : 2,
-    vaccines: [
-      { id: 1, name: 'Vacina Raiva', date: '2025-01-10' },
-      { id: 2, name: 'Vacina V8', date: '2022-03-15' },
-      { id: 3, name: 'Vacina Parvovirose', date: '2023-04-01' }
-    ]
+    const data = response.data
+    pet.value = {
+      ...data,
+      vacinasAplicadas: data.vacinas_aplicadas || [] // mapeia para camelCase
+    }
+  } catch (error) {
+    console.error('Erro ao buscar pet:', error)
   }
-})
-
-function isVaccineLate(vacDate: string): boolean {
-  const dateVaccine = new Date(vacDate)
-  const now = new Date()
-  const diffTime = now.getTime() - dateVaccine.getTime()
-  const diffDays = diffTime / (1000 * 3600 * 24)
-  return diffDays > 365
 }
 
+// Função para formatar datas
 function formatDateBR(dateStr: string): string {
   if (!dateStr) return ''
   const date = new Date(dateStr)
   return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`
 }
 
-const overdueVaccines = computed(() =>
-  pet.value.vaccines.filter(v => isVaccineLate(v.date))
-)
-const inDateVaccines = computed(() =>
-  pet.value.vaccines.filter(v => !isVaccineLate(v.date))
-)
+// Verifica se vacina está atrasada (> 365 dias desde a aplicação)
+function isVaccineLate(dataAplicacao: string): boolean {
+  const dateVaccine = new Date(dataAplicacao)
+  const now = new Date()
+  const diffDays = (now.getTime() - dateVaccine.getTime()) / (1000 * 3600 * 24)
+  return diffDays > 365
+}
 
-const necessaryVaccines = computed(() => {
-  if (pet.value.species === 'Cachorro') {
-    return [
-      { name: 'Vacina Raiva' },
-      { name: 'Vacina V8' },
-      { name: 'Vacina Parvovirose' }
-    ]
-  } else if (pet.value.species === 'Gato') {
-    return [
-      { name: 'Vacina V3' },
-      { name: 'Vacina Leucemia Felina' }
-    ]
-  }
-  return []
-})
+// Computed: vacinas atrasadas e em dia
+const overdueVaccines = computed(() => pet.value?.vacinasAplicadas.filter(v => isVaccineLate(v.data_aplicacao)) || [])
+const inDateVaccines = computed(() => pet.value?.vacinasAplicadas.filter(v => !isVaccineLate(v.data_aplicacao)) || [])
 
 function goBack() {
   router.back()
 }
+
+onMounted(fetchPet)
 </script>
 
 <style scoped>
@@ -125,7 +110,7 @@ function goBack() {
   margin: 20px auto;
   padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   background-color: #fff;
 }
 
@@ -134,9 +119,8 @@ function goBack() {
 }
 
 .vaccines-section h3 {
-  font-size: 20px;
-  margin: 15px 0 10px;
-  color: #222;
+  font-size: 18px;
+  margin: 10px 0 5px;
 }
 
 .vaccines-list {
@@ -148,16 +132,14 @@ function goBack() {
 .vaccine-item {
   display: flex;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   font-size: 16px;
   color: #555;
-  border-bottom: 1px solid #eee;
-  padding: 6px 0;
 }
 
 .vaccine-name {
   font-weight: bold;
-  margin-right: 5px;
+  margin-right: 10px;
 }
 
 .vaccine-date {
@@ -168,10 +150,8 @@ function goBack() {
   font-weight: bold;
 }
 .vaccine-status.green { color: green; }
-.vaccine-status.red { color: rgb(230, 34, 34); }
-.vaccine-status.orange { color: orange; }
+.vaccine-status.red { color: rgb(230,34,34); }
 
-/* Botão voltar */
 .back-btn-wrapper {
   margin-top: 20px;
   text-align: right;
@@ -180,17 +160,12 @@ function goBack() {
   .back-btn-wrapper {
     text-align: center;
   }
-
-  /* Itens de vacina em coluna no mobile */
   .vaccine-item {
     flex-direction: column;
     align-items: flex-start;
     font-size: 14px;
   }
-
-  .vaccine-name,
-  .vaccine-date,
-  .vaccine-status {
+  .vaccine-name, .vaccine-date, .vaccine-status {
     margin: 2px 0;
   }
 }

@@ -1,10 +1,13 @@
 <template>
   <n-card title="Cadastrar Novo Pet" style="max-width: 400px; margin: 20px auto;">
     <n-form ref="formRef" :model="form" :rules="rules" label-placement="top" size="medium">
+      
+      <!-- Nome -->
       <n-form-item label="Nome" path="name">
         <n-input v-model:value="form.name" placeholder="Digite o nome do pet" />
       </n-form-item>
 
+      <!-- Espécie -->
       <n-form-item label="Espécie" path="species">
         <n-select
           v-model:value="form.species"
@@ -13,18 +16,19 @@
         />
       </n-form-item>
 
+      <!-- Data de Nascimento -->
       <n-form-item label="Data de Nascimento" path="birthdate">
         <n-date-picker
-          v-model:value="form.birthdate"
+          v-model:value="birthdateDate"
           type="date"
           format="dd/MM/yyyy"
-          value-format="yyyy-MM-dd"
           placeholder="Selecione a data de nascimento"
           :disabled-date="disabledDateNascimento"
+          @update:value="(val: Date | null) => form.birthdate = val ? val.toISOString().split('T')[0] : ''"
         />
       </n-form-item>
 
-      <!-- VACINAS (mantido, mas não enviado pro backend ainda) -->
+      <!-- Vacinas Tomadas -->
       <n-form-item label="Vacinas Tomadas" path="vaccinesTaken">
         <n-select
           v-model:value="form.vaccinesTaken"
@@ -41,16 +45,17 @@
           :path="'vaccinesTakenDates[' + index + ']'"
         >
           <n-date-picker
-            v-model:value="form.vaccinesTakenDates[index]"
+            v-model:value="vaccinesTakenDatesRefs[index]"
             type="date"
+            format="dd/MM/yyyy"
             placeholder="Selecione a data"
             :disabled-date="disabledDate"
-            format="dd/MM/yyyy"
-            value-format="yyyy-MM-dd"
+            @update:value="(val: Date | null) => form.vaccinesTakenDates[index] = val ? val.toISOString().split('T')[0] : ''"
           />
         </n-form-item>
       </div>
 
+      <!-- Vacinas a Tomar -->
       <n-form-item label="Vacinas a Tomar" path="vaccinesToTake">
         <n-select
           v-model:value="form.vaccinesToTake"
@@ -67,28 +72,30 @@
           :path="'vaccinesToTakeDates[' + index + ']'"
         >
           <n-date-picker
-            v-model:value="form.vaccinesToTakeDates[index]"
+            v-model:value="vaccinesToTakeDatesRefs[index]"
             type="date"
+            format="dd/MM/yyyy"
             placeholder="Selecione a data"
             :disabled-date="disabledDate"
-            format="dd/MM/yyyy"
-            value-format="yyyy-MM-dd"
+            @update:value="(val: Date | null) => form.vaccinesToTakeDates[index] = val ? val.toISOString().split('T')[0] : ''"
           />
         </n-form-item>
       </div>
 
+      <!-- Botões -->
       <n-form-item>
         <n-space>
           <n-button type="primary" @click="submitForm">Cadastrar</n-button>
           <n-button @click="cancel">Cancelar</n-button>
         </n-space>
       </n-form-item>
+
     </n-form>
   </n-card>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import axios from 'axios';
@@ -98,16 +105,23 @@ const router = useRouter();
 const message = useMessage();
 const formRef = ref<FormInst | null>(null);
 
+// Modelo do formulário
 const form = reactive({
   name: '',
   species: '',
-  birthdate: null as string | null,
+  birthdate: '', // agora é string
   vaccinesTaken: [] as string[],
-  vaccinesTakenDates: [] as (string | null)[],
+  vaccinesTakenDates: [] as string[],
   vaccinesToTake: [] as string[],
-  vaccinesToTakeDates: [] as (string | null)[]
+  vaccinesToTakeDates: [] as string[]
 });
 
+// Refs temporárias para os DatePickers (valores Date)
+const birthdateDate = ref<Date | null>(null);
+const vaccinesTakenDatesRefs = ref<(Date | null)[]>([]);
+const vaccinesToTakeDatesRefs = ref<(Date | null)[]>([]);
+
+// Opções
 const speciesOptions = [
   { label: 'Cachorro', value: 'Cachorro' },
   { label: 'Gato', value: 'Gato' },
@@ -122,12 +136,14 @@ const vaccinesOptions = [
   { label: 'Vacina Leptospirose', value: 'Leptospirose' }
 ];
 
+// Regras de validação
 const rules = {
   name: [{ required: true, message: 'Nome é obrigatório', trigger: 'blur' }],
   species: [{ required: true, message: 'Espécie é obrigatória', trigger: 'change' }],
-  birthdate: [{ required: true, message: 'Data de nascimento é obrigatória', trigger: 'change' }]
+  birthdate: [{ required: true, message: 'Data de nascimento é obrigatória', trigger: 'blur' }]
 };
 
+// Funções de datas
 function disabledDate(current: Date): boolean {
   return current && current < new Date();
 }
@@ -136,14 +152,18 @@ function disabledDateNascimento(current: Date): boolean {
   return current.getTime() > Date.now();
 }
 
+// Atualiza arrays de datas para vacinas
 function handleVaccinesTakenChange(selected: string[]) {
-  form.vaccinesTakenDates = new Array(selected.length).fill(null);
+  form.vaccinesTakenDates = new Array(selected.length).fill('');
+  vaccinesTakenDatesRefs.value = new Array(selected.length).fill(null);
 }
 
 function handleVaccinesToTakeChange(selected: string[]) {
-  form.vaccinesToTakeDates = new Array(selected.length).fill(null);
+  form.vaccinesToTakeDates = new Array(selected.length).fill('');
+  vaccinesToTakeDatesRefs.value = new Array(selected.length).fill(null);
 }
 
+// Submit
 async function submitForm() {
   if (!formRef.value) return;
 
@@ -159,14 +179,19 @@ async function submitForm() {
     const payload = {
       name: form.name,
       species: form.species,
-      breed: null, // pode remover se não usa
-      birthdate: form.birthdate
+      birthdate: form.birthdate || null,
+      vaccinesTaken: form.vaccinesTaken.map((v, i) => ({
+        name: v,
+        date: form.vaccinesTakenDates[i] || null
+      })),
+      vaccinesToTake: form.vaccinesToTake.map((v, i) => ({
+        name: v,
+        date: form.vaccinesToTakeDates[i] || null
+      }))
     };
 
     await axios.post('http://localhost:8000/api/pets', payload, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+      headers: { Authorization: `Bearer ${token}` }
     });
 
     message.success('Pet cadastrado com sucesso!');
@@ -182,6 +207,7 @@ async function submitForm() {
   }
 }
 
+// Cancelar
 function cancel() {
   router.push('/pets');
 }
