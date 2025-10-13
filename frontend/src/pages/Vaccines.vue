@@ -15,7 +15,6 @@
         :scroll="{ x: 'max-content' }"
         style="margin-top: 24px;"
       />
-      <!-- Paginação -->
       <n-pagination
         v-model:page="currentPage"
         :page-count="totalPages"
@@ -56,7 +55,6 @@
           </n-button>
         </n-space>
       </n-card>
-      <!-- Paginação mobile -->
       <n-pagination
         v-model:page="currentPage"
         :page-count="totalPages"
@@ -90,7 +88,6 @@ const currentPage = ref(1);
 const perPage = ref(10);
 const totalVaccines = ref(0);
 
-// Axios com header Authorization
 const api = axios.create({
   baseURL: "http://localhost:8000/api",
   headers: {
@@ -98,26 +95,33 @@ const api = axios.create({
   },
 });
 
-// Formata data para DD-MM-YYYY
-function formatDateBR(dateString: string) {
-  const date = new Date(dateString);
+function formatDateBR(dateString: string | null) {
+  if (!dateString) return "Não informada";
+  const date = new Date(dateString + "T00:00:00");
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const year = date.getFullYear();
   return `${day}-${month}-${year}`;
 }
 
-// Buscar vacinas com paginação
+// Busca vacinas sem alterar a ordem existente
 async function fetchVaccines(page = currentPage.value) {
+  currentPage.value = page;
   try {
-    const response = await api.get("/vacinas", {
-      params: { limit: perPage.value, page }
+    const response = await api.get("/vacinas", { params: { limit: perPage.value, page } });
+    const items: Vaccine[] = Array.isArray(response.data.items) ? response.data.items : [];
+
+    // Atualiza apenas os itens existentes ou adiciona novos sem reordenar
+    items.forEach(item => {
+      const index = vaccines.value.findIndex(v => v.id === item.id);
+      if (index !== -1) {
+        vaccines.value[index] = item;
+      } else {
+        vaccines.value.push(item);
+      }
     });
 
-    const items = Array.isArray(response.data.items) ? response.data.items : [];
-    vaccines.value = items;
     totalVaccines.value = response.data.count ?? 0;
-    currentPage.value = page;
   } catch (error) {
     console.error("Erro ao buscar vacinas:", error);
     vaccines.value = [];
@@ -126,19 +130,12 @@ async function fetchVaccines(page = currentPage.value) {
   }
 }
 
-// Excluir vacina
 async function goToDelete(id: number) {
   if (!confirm("Tem certeza que deseja excluir esta vacina?")) return;
-
   try {
-    const response = await api.delete(`/vacinas/${id}`);
-    if (response.status === 200 || response.status === 204) {
-      vaccines.value = vaccines.value.filter((v) => v.id !== id);
-      message.success(response.data?.message || "Vacina excluída com sucesso!");
-    } else {
-      message.error("Não foi possível excluir a vacina.");
-      console.warn("DELETE retornou:", response);
-    }
+    await api.delete(`/vacinas/${id}`);
+    vaccines.value = vaccines.value.filter(v => v.id !== id);
+    message.success("Vacina excluída com sucesso!");
   } catch (error: any) {
     console.error("Erro ao excluir vacina:", error);
     const msg = error.response?.data?.message || "Erro ao excluir vacina.";
@@ -146,54 +143,28 @@ async function goToDelete(id: number) {
   }
 }
 
-// Navegação
-function goToCreate() {
-  router.push("/vaccines/create");
-}
+function goToCreate() { router.push("/vaccines/create"); }
+function goToEdit(id: number) { router.push(`/vaccines/edit/${id}`); }
 
-function goToEdit(id: number) {
-  router.push(`/vaccines/edit/${id}`);
-}
-
-// Tabela (desktop)
 const columns = [
   { title: "ID", key: "id" },
   { title: "Nome", key: "nome" },
   { title: "Descrição", key: "descricao" },
-  {
-    title: "Data de Validade",
-    key: "validade",
-    render: (row: Vaccine) =>
-      row.validade ? formatDateBR(row.validade) : "Não informada",
-  },
+  { title: "Data de Validade", key: "validade", render: (row: Vaccine) => formatDateBR(row.validade) },
   {
     title: "Ações",
     key: "actions",
     render(row: Vaccine) {
-      return h(
-        "div",
-        { style: "display:flex; gap:8px;" },
-        [
-          h(
-            NButton,
-            { size: "small", type: "info", onClick: () => goToEdit(row.id) },
-            { default: () => "Editar" }
-          ),
-          h(
-            NButton,
-            { size: "small", type: "error", onClick: () => goToDelete(row.id) },
-            { default: () => "Excluir" }
-          )
-        ]
-      );
-    },
-  },
+      return h("div", { style: "display:flex; gap:8px;" }, [
+        h(NButton, { size: "small", type: "info", onClick: () => goToEdit(row.id) }, { default: () => "Editar" }),
+        h(NButton, { size: "small", type: "error", onClick: () => goToDelete(row.id) }, { default: () => "Excluir" })
+      ]);
+    }
+  }
 ];
 
-// Paginação
 const totalPages = computed(() => Math.ceil(totalVaccines.value / perPage.value));
 
-// Carrega vacinas ao montar
 onMounted(() => fetchVaccines());
 </script>
 

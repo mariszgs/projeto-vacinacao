@@ -6,26 +6,35 @@
       <p><strong>Data de Nascimento:</strong> {{ formatDateBR(pet.birthdate) }}</p>
 
       <div class="vaccines-section" v-if="pet.vacinasAplicadas && pet.vacinasAplicadas.length">
-        <h3>Vacinas Atrasadas</h3>
-        <ul class="vaccines-list">
-          <li v-for="vacina in overdueVaccines" :key="vacina.id" class="vaccine-item">
+        <!-- Vacinas Aplicadas / Atrasadas -->
+        <h3>Vacinas Aplicadas</h3>
+        <ul class="vaccines-list" v-if="vacinasAplicadas.length">
+          <li v-for="vacina in vacinasAplicadas" :key="vacina.id" class="vaccine-item">
             <span class="vaccine-name">{{ vacina.vacina.nome }}</span>
             <span class="vaccine-date">{{ formatDateBR(vacina.data_aplicacao) }}</span>
-            <span class="vaccine-status red">Atrasada</span>
+            <span
+              class="vaccine-status"
+              :class="isVacinaAtrasada(vacina) ? 'red' : 'green'"
+            >
+              {{ isVacinaAtrasada(vacina) ? 'Atrasada' : 'Em Dia' }}
+            </span>
           </li>
         </ul>
+        <p v-else>Nenhuma vacina aplicada.</p>
 
-        <h3>Vacinas em Dia</h3>
-        <ul class="vaccines-list">
-          <li v-for="vacina in inDateVaccines" :key="vacina.id" class="vaccine-item">
+        <!-- Vacinas Agendadas -->
+        <h3>Vacinas Agendadas</h3>
+        <ul class="vaccines-list" v-if="vacinasAgendadas.length">
+          <li v-for="vacina in vacinasAgendadas" :key="vacina.id" class="vaccine-item">
             <span class="vaccine-name">{{ vacina.vacina.nome }}</span>
             <span class="vaccine-date">{{ formatDateBR(vacina.data_aplicacao) }}</span>
-            <span class="vaccine-status green">Em Dia</span>
+            <span class="vaccine-status blue">Agendada</span>
           </li>
         </ul>
+        <p v-else>Nenhuma vacina agendada.</p>
       </div>
       <div v-else>
-        <p>Sem vacinas aplicadas.</p>
+        <p>Sem vacinas registradas.</p>
       </div>
     </div>
 
@@ -36,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 
@@ -59,6 +68,9 @@ const route = useRoute()
 const router = useRouter()
 const pet = ref<Pet | null>(null)
 
+const vacinasAplicadas = ref<VacinaAplicada[]>([])
+const vacinasAgendadas = ref<VacinaAplicada[]>([])
+
 // Buscar dados do pet
 async function fetchPet() {
   try {
@@ -71,31 +83,39 @@ async function fetchPet() {
     const data = response.data
     pet.value = {
       ...data,
-      vacinasAplicadas: data.vacinas_aplicadas || [] // mapeia para camelCase
+      vacinasAplicadas: data.vacinas_aplicadas || []
     }
+    separarVacinas()
   } catch (error) {
     console.error('Erro ao buscar pet:', error)
   }
 }
 
-// Função para formatar datas
+// Separar vacinas em aplicadas (em dia ou atrasadas) e agendadas
+function separarVacinas() {
+  const hoje = new Date().setHours(0, 0, 0, 0)
+
+  vacinasAgendadas.value = pet.value?.vacinasAplicadas.filter(
+    v => new Date(v.data_aplicacao).getTime() > hoje
+  ) || []
+
+  vacinasAplicadas.value = pet.value?.vacinasAplicadas.filter(
+    v => new Date(v.data_aplicacao).getTime() <= hoje
+  ) || []
+}
+
+// Verifica se a vacina está atrasada
+function isVacinaAtrasada(vacina: VacinaAplicada): boolean {
+  const hoje = new Date().setHours(0, 0, 0, 0)
+  return vacina.data_proxima_dose ? new Date(vacina.data_proxima_dose).getTime() < hoje : false
+}
+
+// Formatar data para pt-BR
 function formatDateBR(dateStr: string): string {
   if (!dateStr) return ''
   const date = new Date(dateStr)
-  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`
+  return `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}/${date.getFullYear()}`
 }
-
-// Verifica se vacina está atrasada (> 365 dias desde a aplicação)
-function isVaccineLate(dataAplicacao: string): boolean {
-  const dateVaccine = new Date(dataAplicacao)
-  const now = new Date()
-  const diffDays = (now.getTime() - dateVaccine.getTime()) / (1000 * 3600 * 24)
-  return diffDays > 365
-}
-
-// Computed: vacinas atrasadas e em dia
-const overdueVaccines = computed(() => pet.value?.vacinasAplicadas.filter(v => isVaccineLate(v.data_aplicacao)) || [])
-const inDateVaccines = computed(() => pet.value?.vacinasAplicadas.filter(v => !isVaccineLate(v.data_aplicacao)) || [])
 
 function goBack() {
   router.back()
@@ -103,6 +123,7 @@ function goBack() {
 
 onMounted(fetchPet)
 </script>
+
 
 <style scoped>
 .pet-detail-card {
@@ -151,11 +172,13 @@ onMounted(fetchPet)
 }
 .vaccine-status.green { color: green; }
 .vaccine-status.red { color: rgb(230,34,34); }
+.vaccine-status.blue { color: #007BFF; }
 
 .back-btn-wrapper {
   margin-top: 20px;
   text-align: right;
 }
+
 @media (max-width: 768px) {
   .back-btn-wrapper {
     text-align: center;
