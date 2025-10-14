@@ -16,7 +16,6 @@
           :disabled-date="disablePastDates"
           style="width: 100%"
           format="dd/MM/yyyy"
-          value-format="yyyy-MM-dd"
         />
       </n-form-item>
 
@@ -57,6 +56,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import type { FormInst } from 'naive-ui'
+import axios from 'axios'
 
 const route = useRoute()
 const petIdFromRoute = Number(route.params.id) || null
@@ -66,7 +66,7 @@ const formRef = ref<FormInst | null>(null)
 // Formulário
 const form = ref({
   selectedVaccine: null as number | null,
-  scheduleDate: null as string | null
+  scheduleDate: null as Date | null
 })
 
 // Regras
@@ -75,32 +75,18 @@ const rules = {
   scheduleDate: [{ required: true, message: 'Escolha a data do agendamento' }]
 }
 
-// Opções de vacinas
-const allVaccinesOptions = ref([
-  { label: 'Vacina Antirrábica', value: 1 },
-  { label: 'Vacina V8', value: 2 },
-  { label: 'Vacina V10', value: 3 },
-  { label: 'Vacina Gripe Canina', value: 4 },
-  { label: 'Vacina Leptospirose', value: 5 }
-])
-
+// Pet e vacinas
 const selectedPet = ref<any>(null)
 const overdueVaccines = ref<any[]>([])
+const allVaccinesOptions = ref<{label: string, value: number}[]>([])
 
-// Datas passadas
-function disablePastDates(date: Date) {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return date < today
-}
-
-// Formatar data BR
+// Formatar data para exibir
 function formatDateBR(dateStr: string): string {
   const date = new Date(dateStr)
   return `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}/${date.getFullYear()}`
 }
 
-// Vacina atrasada
+// Verificar vacina atrasada (>365 dias)
 function isVaccineLate(vacDate: string): boolean {
   const dateVaccine = new Date(vacDate)
   const now = new Date()
@@ -110,22 +96,42 @@ function isVaccineLate(vacDate: string): boolean {
   return diffDays > 365
 }
 
-// Carrega pet e vacinas atrasadas
+// Bloquear datas passadas
+function disablePastDates(date: Date) {
+  const today = new Date()
+  today.setHours(0,0,0,0)
+  return date < today
+}
+
+// Buscar dados do backend
 onMounted(async () => {
-  if (!selectedPetId.value) return
   const token = localStorage.getItem('token')
+  if (!token || !selectedPetId.value) return
+
   try {
-    const res = await fetch(`http://localhost:8000/api/pets/${selectedPetId.value}`, {
+    // Pet
+    const resPet = await axios.get(`http://127.0.0.1:8000/api/pets/${selectedPetId.value}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    if (!res.ok) throw new Error('Erro ao carregar pet')
-    const data = await res.json()
-    selectedPet.value = data
-    if (data.vacinas && Array.isArray(data.vacinas)) {
-      overdueVaccines.value = data.vacinas.filter((v: any) => isVaccineLate(v.date || v.data_aplicacao))
+    selectedPet.value = resPet.data
+
+    // Vacinas atrasadas
+    if (selectedPet.value.vacinas && Array.isArray(selectedPet.value.vacinas)) {
+      overdueVaccines.value = selectedPet.value.vacinas.filter((v: any) => isVaccineLate(v.date || v.data_aplicacao))
     }
+
+    // Todas vacinas
+    const resVacinas = await axios.get('http://127.0.0.1:8000/api/vacinas', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    allVaccinesOptions.value = resVacinas.data.items.map((v: any) => ({
+      label: v.nome,
+      value: v.id
+    }))
+
   } catch (err) {
-    console.error(err)
+    console.error('Erro ao carregar dados do pet ou vacinas:', err)
   }
 })
 
@@ -134,51 +140,63 @@ async function scheduleVaccination() {
   if (!selectedPetId.value || !formRef.value) return
   try {
     await formRef.value.validate()
-    const payload = {
-      pet_id: selectedPetId.value,
-      vacina_id: form.value.selectedVaccine,
-      data_agendada: form.value.scheduleDate,
-      observacoes: null
-    }
-    const token = localStorage.getItem('token')
-if (!token) {
-  alert('Você precisa estar logado!')
-  return
-}
 
-    const res = await fetch(`http://127.0.0.1:8000/api/agendamento-de-vacinas`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify(payload)
-    })
-    const result = await res.json()
-    if (!res.ok) {
-      console.error('Erro ao agendar vacina:', result)
-      alert(result.message || 'Erro ao agendar vacina')
+    const token = localStorage.getItem('token')
+    if (!token) {
+      alert('Você precisa estar logado!')
       return
     }
 
+    // ✅ Garante formato "YYYY-MM-DD" (aceito pelo backend Laravel)
+    const dataAgendadaFormatted = form.value.scheduleDate
+      ? new Date(form.value.scheduleDate).toISOString().split('T')[0]
+      : null
+
+    const payload = {
+      pet_id: selectedPetId.value,
+      vacina_id: form.value.selectedVaccine,
+      data_agendada: dataAgendadaFormatted,
+      observacoes: null
+    }
+
+    const res = await axios.post(
+      'http://127.0.0.1:8000/api/agendamento-de-vacinas',
+      payload,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+
     alert('Vacinação agendada com sucesso!')
+
+    // ✅ Garante que o array vacinas exista antes de dar push
+    if (!selectedPet.value.vacinas || !Array.isArray(selectedPet.value.vacinas)) {
+      selectedPet.value.vacinas = []
+    }
+
+    // Atualizar lista local
+    const vacinaLabel = allVaccinesOptions.value.find(
+      v => v.value === payload.vacina_id
+    )?.label
+
+    selectedPet.value.vacinas.push({
+      id: res.data.id,
+      name: vacinaLabel,
+      date: dataAgendadaFormatted
+    })
+
+    overdueVaccines.value = selectedPet.value.vacinas.filter((v: any) =>
+      isVaccineLate(v.date)
+    )
 
     // Limpar formulário
     form.value.selectedVaccine = null
     form.value.scheduleDate = null
 
-    // Atualizar lista de vacinas atrasadas
-    const vacinaLabel = allVaccinesOptions.value.find(v => v.value === payload.vacina_id)?.label
-    selectedPet.value.vacinas.push({
-      id: result.id,
-      name: vacinaLabel,
-      date: form.value.scheduleDate
-    })
-    overdueVaccines.value = selectedPet.value.vacinas.filter((v: any) => isVaccineLate(v.date))
-  } catch (err) {
-    console.warn('Formulário inválido:', err)
+  } catch (err: any) {
+    console.error('Erro ao agendar vacina:', err.response?.data || err)
+    alert(err.response?.data?.message || 'Erro ao agendar vacina')
   }
 }
+
 </script>
 
 

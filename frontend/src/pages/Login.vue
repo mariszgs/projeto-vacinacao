@@ -73,13 +73,17 @@ async function handleLogin() {
     // Salvando o token
     localStorage.setItem('token', response.data.access_token);
 
+    // Configura Axios para todas as requisições
+    axios.defaults.headers.common['Authorization'] = 'Bearer ' + response.data.access_token
+
     message.success('Login realizado com sucesso!');
-    router.push('/home');
+    router.push('/home'); // tela de perfil ou dashboard
   } catch (error) {
     console.error(error);
     message.error('Credenciais inválidas ou erro no servidor.');
   }
 }
+
 
 async function handleRegister() {
   try {

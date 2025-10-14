@@ -5,8 +5,8 @@
       <p><strong>Espécie:</strong> {{ pet.species }}</p>
       <p><strong>Data de Nascimento:</strong> {{ formatDateBR(pet.birthdate) }}</p>
 
-      <div class="vaccines-section" v-if="pet.vacinasAplicadas && pet.vacinasAplicadas.length">
-        <!-- Vacinas Aplicadas / Atrasadas -->
+      <div class="vaccines-section">
+        <!-- Vacinas Aplicadas -->
         <h3>Vacinas Aplicadas</h3>
         <ul class="vaccines-list" v-if="vacinasAplicadas.length">
           <li v-for="vacina in vacinasAplicadas" :key="vacina.id" class="vaccine-item">
@@ -27,14 +27,11 @@
         <ul class="vaccines-list" v-if="vacinasAgendadas.length">
           <li v-for="vacina in vacinasAgendadas" :key="vacina.id" class="vaccine-item">
             <span class="vaccine-name">{{ vacina.vacina.nome }}</span>
-            <span class="vaccine-date">{{ formatDateBR(vacina.data_aplicacao) }}</span>
+            <span class="vaccine-date">{{ formatDateBR(vacina.data_agendada) }}</span>
             <span class="vaccine-status blue">Agendada</span>
           </li>
         </ul>
         <p v-else>Nenhuma vacina agendada.</p>
-      </div>
-      <div v-else>
-        <p>Sem vacinas registradas.</p>
       </div>
     </div>
 
@@ -49,11 +46,22 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 
+interface Vacina {
+  id: number
+  nome: string
+}
+
 interface VacinaAplicada {
   id: number
-  vacina: { id: number; nome: string }
+  vacina: Vacina
   data_aplicacao: string
   data_proxima_dose?: string | null
+}
+
+interface VacinaAgendada {
+  id: number
+  vacina: Vacina
+  data_agendada: string
 }
 
 interface Pet {
@@ -61,60 +69,68 @@ interface Pet {
   name: string
   species: string
   birthdate: string
-  vacinasAplicadas: VacinaAplicada[]
+  vacinas_aplicadas: VacinaAplicada[]
+  vacinas_agendadas?: VacinaAgendada[]
 }
 
 const route = useRoute()
 const router = useRouter()
 const pet = ref<Pet | null>(null)
-
 const vacinasAplicadas = ref<VacinaAplicada[]>([])
-const vacinasAgendadas = ref<VacinaAplicada[]>([])
+const vacinasAgendadas = ref<VacinaAgendada[]>([])
 
+// Buscar dados do pet
 // Buscar dados do pet
 async function fetchPet() {
   try {
     const petId = Number(route.params.id)
     const token = localStorage.getItem('token') || ''
-    const response = await axios.get(`http://localhost:8000/api/pets/${petId}`, {
+    const response = await axios.get(`http://127.0.0.1:8000/api/pets/${petId}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 
     const data = response.data
+
     pet.value = {
       ...data,
-      vacinasAplicadas: data.vacinas_aplicadas || []
+      vacinas_aplicadas: data.vacinas_aplicadas || [],
+      vacinas_agendadas: data.vacinas_agendadas || data.agendamentos || []
     }
-    separarVacinas()
+
+    // ✅ Protege contra null
+    vacinasAplicadas.value = pet.value?.vacinas_aplicadas ?? []
+    vacinasAgendadas.value = pet.value?.vacinas_agendadas ?? []
+
   } catch (error) {
     console.error('Erro ao buscar pet:', error)
   }
 }
 
-// Separar vacinas em aplicadas (em dia ou atrasadas) e agendadas
-function separarVacinas() {
-  const hoje = new Date().setHours(0, 0, 0, 0)
 
-  vacinasAgendadas.value = pet.value?.vacinasAplicadas.filter(
-    v => new Date(v.data_aplicacao).getTime() > hoje
-  ) || []
-
-  vacinasAplicadas.value = pet.value?.vacinasAplicadas.filter(
-    v => new Date(v.data_aplicacao).getTime() <= hoje
-  ) || []
-}
 
 // Verifica se a vacina está atrasada
 function isVacinaAtrasada(vacina: VacinaAplicada): boolean {
+  if (!vacina.data_aplicacao) return false
+
   const hoje = new Date().setHours(0, 0, 0, 0)
-  return vacina.data_proxima_dose ? new Date(vacina.data_proxima_dose).getTime() < hoje : false
+  const dataAplicacao = new Date(vacina.data_aplicacao).setHours(0, 0, 0, 0)
+
+  // Data limite de 1 ano atrás
+  const umAnoAtras = new Date()
+  umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1)
+  umAnoAtras.setHours(0, 0, 0, 0)
+
+  // Vacina é considerada atrasada se foi aplicada há mais de 1 ano
+  return dataAplicacao <= umAnoAtras.getTime()
 }
 
-// Formatar data para pt-BR
+
+
+// Formatar data
 function formatDateBR(dateStr: string): string {
   if (!dateStr) return ''
   const date = new Date(dateStr)
-  return `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}/${date.getFullYear()}`
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`
 }
 
 function goBack() {

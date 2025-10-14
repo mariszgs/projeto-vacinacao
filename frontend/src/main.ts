@@ -6,6 +6,13 @@ import router from './router'
 
 import naive from "naive-ui";
 
+import axios from 'axios'
+
+const token = localStorage.getItem('token')
+if (token) {
+  axios.defaults.headers.common['Authorization'] = 'Bearer ' + token
+}
+
 const app = createApp(App)
 
 app.use(createPinia())

@@ -11,6 +11,7 @@ import Schedule from '../pages/Schedule.vue';
 import Vaccines from '../pages/Vaccines.vue';
 import VaccinesCreate from '../pages/VaccinesCreate.vue';
 import VaccinesEdit from '../pages/VaccinesEdit.vue';
+import VaccinesView from '../pages/VaccinesView.vue';
 
 const routes = [
   {
@@ -71,6 +72,11 @@ const routes = [
         path: 'vaccines/edit/:id',
         name: 'vaccines-edit',
         component: VaccinesEdit
+      },
+      {
+        path: 'vaccines/view/:id',
+        name: 'vaccines-view',
+        component: VaccinesView
       }
 
     ]

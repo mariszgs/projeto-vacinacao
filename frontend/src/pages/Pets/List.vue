@@ -26,7 +26,8 @@
         :title="pet.name"
       >
         <p><strong>Espécie:</strong> {{ pet.species }}</p>
-        <p><strong>Idade:</strong> {{ pet.age }} anos</p>
+        <p><strong>Idade:</strong> {{ pet.age }}</p>
+
 
         <n-space vertical style="margin-top: 8px;">
           <n-button size="small" @click="goToView(pet.id)">Visualizar</n-button>
@@ -88,10 +89,12 @@ async function fetchPets(page = 1) {
       totalPets.value = response.data.count;
     }
 
-    pets.value = petsArray.map((pet: any) => ({
-      ...pet,
-      age: calcularIdade(pet.birthdate),
-    }));
+    pets.value = petsArray
+      .map((pet: any) => ({
+        ...pet,
+        age: formatarIdade(pet.birthdate),
+      }))
+      .sort((a, b) => a.id - b.id); // 🔹 ordena pelo ID
 
     currentPage.value = page;
   } catch (error) {
@@ -100,18 +103,30 @@ async function fetchPets(page = 1) {
   }
 }
 
+
 // Calcular idade baseado na data de nascimento
-function calcularIdade(dataNascimento: string | null): number {
-  if (!dataNascimento) return 0;
+// Substitua a função calcularIdade por esta:
+function formatarIdade(dataNascimento: string | null): string {
+  if (!dataNascimento) return '0 anos';
+  
   const nascimento = new Date(dataNascimento);
   const hoje = new Date();
-  let idade = hoje.getFullYear() - nascimento.getFullYear();
-  const m = hoje.getMonth() - nascimento.getMonth();
-  if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) {
-    idade--;
+
+  let anos = hoje.getFullYear() - nascimento.getFullYear();
+  let meses = hoje.getMonth() - nascimento.getMonth();
+  const dias = hoje.getDate() - nascimento.getDate();
+
+  if (dias < 0) meses--; // ajusta mês se ainda não completou o dia
+  if (meses < 0) {
+    anos--;
+    meses += 12;
   }
-  return idade;
+
+  if (anos < 1) return `${meses} ${meses === 1 ? 'mês' : 'meses'}`;
+  if (meses === 0) return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+  return `${anos} ${anos === 1 ? 'ano' : 'anos'} e ${meses} ${meses === 1 ? 'mês' : 'meses'}`;
 }
+
 
 // Excluir pet
 async function goToDelete(id: number) {

@@ -1,4 +1,4 @@
-<template>
+<template> 
   <n-card title="Lista de Vacinas">
     <!-- Botão adicionar -->
     <div class="add-btn-wrapper">
@@ -33,26 +33,18 @@
         style="margin-bottom: 12px;"
         :title="vaccine.nome"
       >
-        <p><strong>Descrição:</strong> {{ vaccine.descricao }}</p>
-        <p><strong>Data de Validade:</strong>
+        <p>
+          <strong>Descrição:</strong> {{ truncated(vaccine.descricao, 15) }}
+        </p>
+        <p>
+          <strong>Data de Validade:</strong>
           {{ vaccine.validade ? formatDateBR(vaccine.validade) : 'Não informada' }}
         </p>
 
         <n-space style="margin-top: 8px;">
-          <n-button
-            size="small"
-            type="info"
-            @click="goToEdit(vaccine.id)"
-          >
-            Editar
-          </n-button>
-          <n-button
-            size="small"
-            type="error"
-            @click="goToDelete(vaccine.id)"
-          >
-            Excluir
-          </n-button>
+          <n-button size="small" @click="goToEdit(vaccine.id)">Editar</n-button>
+          <n-button size="small" @click="goToDelete(vaccine.id)">Excluir</n-button>
+          <n-button size="small" @click="goToView(vaccine.id)">Visualizar</n-button>
         </n-space>
       </n-card>
       <n-pagination
@@ -104,6 +96,10 @@ function formatDateBR(dateString: string | null) {
   return `${day}-${month}-${year}`;
 }
 
+function truncated(text: string, max = 15) {
+  return text.length > max ? text.slice(0, max) + "..." : text;
+}
+
 // Busca vacinas sem alterar a ordem existente
 async function fetchVaccines(page = currentPage.value) {
   currentPage.value = page;
@@ -111,7 +107,6 @@ async function fetchVaccines(page = currentPage.value) {
     const response = await api.get("/vacinas", { params: { limit: perPage.value, page } });
     const items: Vaccine[] = Array.isArray(response.data.items) ? response.data.items : [];
 
-    // Atualiza apenas os itens existentes ou adiciona novos sem reordenar
     items.forEach(item => {
       const index = vaccines.value.findIndex(v => v.id === item.id);
       if (index !== -1) {
@@ -145,18 +140,24 @@ async function goToDelete(id: number) {
 
 function goToCreate() { router.push("/vaccines/create"); }
 function goToEdit(id: number) { router.push(`/vaccines/edit/${id}`); }
+function goToView(id: number) { router.push(`/vaccines/view/${id}`); }
+
+function renderDescription(row: Vaccine) {
+  return h("span", truncated(row.descricao, 15));
+}
 
 const columns = [
   { title: "ID", key: "id" },
   { title: "Nome", key: "nome" },
-  { title: "Descrição", key: "descricao" },
+  { title: "Descrição", key: "descricao", render: renderDescription },
   { title: "Data de Validade", key: "validade", render: (row: Vaccine) => formatDateBR(row.validade) },
   {
     title: "Ações",
     key: "actions",
     render(row: Vaccine) {
       return h("div", { style: "display:flex; gap:8px;" }, [
-        h(NButton, { size: "small", type: "info", onClick: () => goToEdit(row.id) }, { default: () => "Editar" }),
+        h(NButton, { size: "small",  onClick: () => goToEdit(row.id) }, { default: () => "Editar" }),
+        h(NButton, { size: "small",  onClick: () => goToView(row.id) }, { default: () => "Visualizar" }),
         h(NButton, { size: "small", type: "error", onClick: () => goToDelete(row.id) }, { default: () => "Excluir" })
       ]);
     }
