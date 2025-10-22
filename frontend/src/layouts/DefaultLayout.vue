@@ -1,7 +1,8 @@
 <template>
   <n-layout has-sider>
-    <!-- Sidebar -->
+    <!-- Sidebar (visível só no desktop) -->
     <n-layout-sider
+      v-if="!isMobile"
       bordered
       :collapsed="isCollapsed"
       :collapsed-width="64"
@@ -15,15 +16,56 @@
         :options="menuOptions"
         :collapsed="isCollapsed"
         @update:value="handleSelect"
+        class="sidebar-menu"
       />
     </n-layout-sider>
 
+    <!-- Drawer (para mobile) -->
+    <n-drawer 
+      v-model:show="showDrawer" 
+      placement="left" 
+      :width="280"
+      class="mobile-drawer"
+    >
+      <n-drawer-content title="Menu" :native-scrollbar="false">
+        <n-menu 
+          :options="menuOptions" 
+          @update:value="handleSelect"
+          class="mobile-menu"
+        />
+      </n-drawer-content>
+    </n-drawer>
+
     <!-- Conteúdo principal -->
     <n-layout>
-      <n-layout-header bordered style="padding: 0 16px;">
-        <h2 style="font-size: 18px; margin: 12px 0;">Projeto Vacinação</h2>
+      <n-layout-header bordered class="header">
+        <!-- Botão hamburguer no mobile -->
+        <div class="header-left">
+          <n-button
+            v-if="isMobile"
+            text
+            @click="showDrawer = true"
+            class="menu-button"
+            aria-label="Abrir menu"
+          >
+            <n-icon size="28">
+              <menu-outline />
+            </n-icon>
+          </n-button>
+          
+          <!-- Logo ou título no mobile -->
+          <span v-if="isMobile" class="mobile-title">
+            PetApp
+          </span>
+        </div>
+
+        <!-- Espaço para outros elementos do header -->
+        <div class="header-right">
+          <!-- Adicione outros elementos do header aqui -->
+        </div>
       </n-layout-header>
-      <n-layout-content style="padding: 16px;">
+
+      <n-layout-content class="content">
         <router-view />
       </n-layout-content>
     </n-layout>
@@ -39,32 +81,62 @@ import {
   PawOutline,
   LogOutOutline,
   PersonCircleOutline,
-  MedicalOutline
+  MedicalOutline,
+  MenuOutline
 } from '@vicons/ionicons5'
 
 const router = useRouter()
 const isCollapsed = ref(false)
+const showDrawer = ref(false)
 
-// Detecta se é mobile com reactive
+// Detecta se é mobile com breakpoint mais realista
 const screenWidth = ref(window.innerWidth)
-const isMobile = computed(() => screenWidth.value <= 768)
+const isMobile = computed(() => screenWidth.value < 1024) // Tablet também como mobile
 
-// Ajusta isCollapsed conforme dispositivo
 function handleResize() {
   screenWidth.value = window.innerWidth
+  if (!isMobile.value) {
+    showDrawer.value = false // fecha o drawer ao mudar pra desktop
+  }
+}
+
+// Fechar drawer ao navegar (melhor UX)
+function handleSelect(key: string) {
   if (isMobile.value) {
-    isCollapsed.value = true // sempre colapsado no mobile
-  } else {
-    isCollapsed.value = false // desktop começa expandido
+    showDrawer.value = false
+  }
+  
+  // Pequeno delay para melhor feedback visual
+  setTimeout(() => {
+    if (key === 'home') router.push('/home')
+    else if (key === 'pets') router.push('/pets')
+    else if (key === 'profile') router.push('/profile')
+    else if (key === 'vaccines') router.push('/vaccines')
+    else if (key === 'logout') {
+      // Adicionar confirmação para logout
+      if (confirm('Deseja realmente sair?')) {
+        router.push('/')
+      }
+    }
+  }, 150)
+}
+
+// Fechar drawer com ESC key
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && showDrawer.value) {
+    showDrawer.value = false
   }
 }
 
 onMounted(() => {
   window.addEventListener('resize', handleResize)
-  handleResize() // inicializa
+  window.addEventListener('keydown', handleKeydown)
+  handleResize()
 })
+
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('keydown', handleKeydown)
 })
 
 const menuOptions = [
@@ -94,12 +166,152 @@ const menuOptions = [
     icon: () => h(NIcon, null, { default: () => h(LogOutOutline) })
   }
 ]
-
-function handleSelect(key: string) {
-  if (key === 'home') router.push('/home')
-  else if (key === 'pets') router.push('/pets')
-  else if (key === 'profile') router.push('/profile')
-  else if (key === 'vaccines') router.push('/vaccines')
-  else if (key === 'logout') router.push('/')
-}
 </script>
+
+<style scoped>
+.header {
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  background: var(--n-color);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menu-button {
+  padding: 8px;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.menu-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.mobile-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--n-text-color);
+}
+
+.content {
+  padding: 16px;
+  min-height: calc(100vh - 64px);
+}
+
+/* MELHORIAS PARA O SIDEBAR - ALINHAMENTO À ESQUERDA */
+:deep(.sidebar-menu .n-menu-item) {
+  padding-left: 16px !important;
+  margin: 4px 8px;
+}
+
+:deep(.sidebar-menu .n-menu-item-content) {
+  justify-content: flex-start !important;
+  padding-left: 0 !important;
+}
+
+:deep(.sidebar-menu .n-menu-item-content__icon) {
+  margin-right: 12px;
+  margin-left: 0;
+}
+
+:deep(.sidebar-menu .n-menu-item-content__text) {
+  margin-left: 0;
+}
+
+/* MELHORIAS PARA O DRAWER MOBILE - ALINHAMENTO À ESQUERDA */
+:deep(.mobile-menu .n-menu-item) {
+  padding-left: 20px !important;
+  margin: 4px 8px;
+}
+
+:deep(.mobile-menu .n-menu-item-content) {
+  justify-content: flex-start !important;
+  padding-left: 0 !important;
+}
+
+:deep(.mobile-menu .n-menu-item-content__icon) {
+  margin-right: 16px;
+  margin-left: 0;
+}
+
+:deep(.mobile-menu .n-menu-item-content__text) {
+  margin-left: 0;
+  font-size: 16px;
+}
+
+/* Melhorias para o drawer mobile */
+:deep(.mobile-drawer .n-drawer-content) {
+  border-radius: 0 16px 16px 0;
+}
+
+:deep(.mobile-drawer .n-drawer-header) {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--n-divider-color);
+}
+
+:deep(.mobile-drawer .n-menu-item) {
+  border-radius: 8px;
+}
+
+:deep(.mobile-drawer .n-menu-item--selected) {
+  background-color: var(--n-color-primary);
+  color: white;
+}
+
+/* Melhorar toque para mobile */
+:deep(.n-menu-item) {
+  min-height: 48px;
+}
+
+/* Animações suaves */
+:deep(.n-drawer) {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Overlay mais escuro para melhor contraste */
+:deep(.n-drawer-mask) {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* REMOVER ESPAÇAMENTOS EXCESSIVOS DO NAIVE UI */
+:deep(.n-menu) {
+  padding: 8px 0;
+}
+
+:deep(.n-menu-item-content) {
+  padding: 0 !important;
+}
+
+:deep(.n-menu-item-content__icon) {
+  min-width: 24px;
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 0 12px;
+  }
+  
+  .content {
+    padding: 12px;
+  }
+  
+  :deep(.mobile-drawer) {
+    width: 100vw !important;
+    max-width: 300px;
+  }
+  
+  :deep(.mobile-menu .n-menu-item) {
+    padding-left: 16px !important;
+  }
+}
+</style>
