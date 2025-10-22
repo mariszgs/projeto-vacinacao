@@ -53,10 +53,6 @@
             </n-icon>
           </n-button>
           
-          <!-- Logo ou título no mobile -->
-          <span v-if="isMobile" class="mobile-title">
-            PetApp
-          </span>
         </div>
 
         <!-- Espaço para outros elementos do header -->
@@ -208,7 +204,6 @@ const menuOptions = [
   min-height: calc(100vh - 64px);
 }
 
-/* MELHORIAS PARA O SIDEBAR - ALINHAMENTO À ESQUERDA */
 :deep(.sidebar-menu .n-menu-item) {
   padding-left: 16px !important;
   margin: 4px 8px;
@@ -228,7 +223,6 @@ const menuOptions = [
   margin-left: 0;
 }
 
-/* MELHORIAS PARA O DRAWER MOBILE - ALINHAMENTO À ESQUERDA */
 :deep(.mobile-menu .n-menu-item) {
   padding-left: 20px !important;
   margin: 4px 8px;
