@@ -120,10 +120,30 @@ const form = ref({
 })
 
 // Regras
+//  Regras atualizadas para aceitar timestamp e ID numérico
 const rules = {
-  selectedVaccine: [{ required: true, message: 'Selecione uma vacina', trigger: 'change' }],
-  scheduleDate: [{ required: true, message: 'Escolha a data do agendamento', trigger: 'change' }]
+  selectedVaccine: [
+    {
+      required: true,
+      validator: (_rule: any, value: number | null) => {
+        if (!value) return new Error('Selecione uma vacina')
+        return true
+      },
+      trigger: ['change', 'blur']
+    }
+  ],
+  scheduleDate: [
+    {
+      required: true,
+      validator: (_rule: any, value: number | null) => {
+        if (!value) return new Error('Escolha a data do agendamento')
+        return true
+      },
+      trigger: ['change', 'blur']
+    }
+  ]
 }
+
 
 // Pet e vacinas
 const selectedPet = ref<any>(null)
@@ -208,11 +228,13 @@ onMounted(async () => {
 })
 
 // Agendar vacina
+// Agendar vacina
 async function scheduleVaccination() {
   if (!selectedPetId.value || !formRef.value) return
-  
+
   scheduling.value = true
   try {
+    // Força a validação e captura erros de forma mais clara
     await formRef.value.validate()
 
     const token = localStorage.getItem('token')
@@ -221,7 +243,7 @@ async function scheduleVaccination() {
       return
     }
 
-    //  Garantindo formato "YYYY-MM-DD" 
+    // Formatar a data corretamente (YYYY-MM-DD)
     const dataAgendadaFormatted = form.value.scheduleDate
       ? new Date(form.value.scheduleDate).toISOString().split('T')[0]
       : null
@@ -233,14 +255,16 @@ async function scheduleVaccination() {
       observacoes: null
     }
 
-    await axios.post(
+
+    // Requisição ao backend
+    const res = await axios.post(
       'http://127.0.0.1:8000/api/agendamento-de-vacinas',
       payload,
       { headers: { Authorization: `Bearer ${token}` } }
     )
 
     message.success('Vacinação agendada com sucesso!')
-    
+
     // Limpar formulário
     form.value.selectedVaccine = null
     form.value.scheduleDate = null
@@ -248,12 +272,21 @@ async function scheduleVaccination() {
     router.push('/pets')
 
   } catch (err: any) {
-    console.error('Erro ao agendar vacina:', err.response?.data || err)
-    message.error(err.response?.data?.message || 'Erro ao agendar vacina')
+
+    if (Array.isArray(err)) {
+      // Se for erro de validação do Naive UI
+      message.error('Preencha todos os campos obrigatórios corretamente.')
+    } else if (err.response) {
+      // Erro vindo do backend
+      message.error(err.response.data.message || 'Erro no servidor.')
+    } else {
+      message.error('Erro inesperado ao agendar vacina.')
+    }
   } finally {
     scheduling.value = false
   }
 }
+
 
 function goBack() {
   router.push('/pets')
