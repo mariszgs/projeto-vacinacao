@@ -1,78 +1,128 @@
 <template>
-  <n-card title="Agendar Vacinação" class="schedule-card">
-    <n-form ref="formRef" :model="form" :rules="rules" label-placement="top" size="medium">
-      
-      <!-- Nome do pet -->
-      <n-form-item label="Pet">
-        <span>{{ selectedPet?.name || 'Carregando...' }}</span>
-      </n-form-item>
+  <div class="page-container">
+    <n-card 
+      title="Agendar Vacinação"
+      class="schedule-card"
+      :bordered="true"
+    >
+      <!-- Transição suave -->
+      <transition name="fade" mode="out-in">
+        <div v-if="selectedPet" key="content">
+          <!-- Cabeçalho do Pet -->
+          <div class="pet-header">
+            <div class="pet-info">
+              <h2 class="pet-name">{{ selectedPet.name }}</h2>
+              <p class="pet-species">{{ selectedPet.species }}</p>
+            </div>
+          </div>
 
-      <!-- Data do agendamento -->
-      <n-form-item label="Data do agendamento" path="scheduleDate">
-        <n-date-picker
-          v-model:value="form.scheduleDate"
-          type="date"
-          placeholder="Escolha a data"
-          :disabled-date="disablePastDates"
-          style="width: 100%"
-          format="dd/MM/yyyy"
-        />
-      </n-form-item>
+          <n-divider class="custom-divider" />
 
-      <!-- Seletor de vacina -->
-      <n-form-item label="Vacina" path="selectedVaccine">
-        <n-select
-          v-model:value="form.selectedVaccine"
-          :options="allVaccinesOptions"
-          placeholder="Selecione a vacina"
-          style="width: 100%"
-        />
-      </n-form-item>
+          <n-form ref="formRef" :model="form" :rules="rules" label-placement="top" size="large" class="schedule-form">
+            <!-- Data do agendamento -->
+            <n-form-item label="Data do Agendamento" path="scheduleDate" class="form-item">
+              <n-date-picker
+                v-model:value="form.scheduleDate"
+                type="date"
+                placeholder="Escolha a data"
+                :disabled-date="disablePastDates"
+                style="width: 100%"
+                format="dd/MM/yyyy"
+                size="large"
+              />
+            </n-form-item>
 
-      <!-- Vacinas atrasadas do pet -->
-      <div v-if="selectedPet && overdueVaccines.length">
-        <h3>Vacinas Atrasadas do pet {{ selectedPet.name }}</h3>
-        <ul class="vaccines-list">
-          <li v-for="vacina in overdueVaccines" :key="vacina.id" class="vaccine-item">
-            <span class="vaccine-name">{{ vacina.name }}</span>
-            <span class="vaccine-date">{{ formatDateBR(vacina.date) }}</span>
-            <span class="vaccine-status red">Atrasada</span>
-          </li>
-        </ul>
-      </div>
+            <!-- Seletor de vacina -->
+            <n-form-item label="Vacina" path="selectedVaccine" class="form-item">
+              <n-select
+                v-model:value="form.selectedVaccine"
+                :options="allVaccinesOptions"
+                placeholder="Selecione a vacina"
+                style="width: 100%"
+                size="large"
+              />
+            </n-form-item>
 
-      <!-- Botão -->
-      <n-form-item>
-        <n-button type="primary" class="confirm-btn" @click="scheduleVaccination">
-          Confirmar Agendamento
-        </n-button>
-      </n-form-item>
+            <!-- Vacinas Atrasadas -->
+            <div v-if="overdueVaccines.length" class="overdue-section">
+              <h3 class="section-title">Vacinas Atrasadas</h3>
+              <div class="vaccines-list">
+                <n-card
+                  v-for="vacina in overdueVaccines"
+                  :key="vacina.id"
+                  class="vaccine-card overdue"
+                >
+                  <div class="vaccine-content">
+                    <div class="vaccine-info">
+                      <span class="vaccine-name">{{ vacina.name }}</span>
+                      <span class="vaccine-date">{{ formatDateBR(vacina.date) }}</span>
+                    </div>
+                    <n-tag type="error" size="small" class="status-tag">
+                      Atrasada
+                    </n-tag>
+                  </div>
+                </n-card>
+              </div>
+            </div>
 
-    </n-form>
-  </n-card>
+            <!-- Botões de Ação -->
+            <div class="action-buttons">
+              <n-button 
+                type="primary" 
+                @click="scheduleVaccination" 
+                size="large"
+                class="action-btn"
+                :loading="scheduling"
+              >
+                Confirmar Agendamento
+              </n-button>
+              <n-button 
+                @click="goBack" 
+                size="large"
+                class="action-btn"
+                :disabled="scheduling"
+              >
+                Cancelar
+              </n-button>
+            </div>
+          </n-form>
+        </div>
+
+        <!-- Loading state -->
+        <div v-else key="loading" class="loading-container">
+          <n-skeleton height="32px" width="200px" style="margin-bottom: 20px;" />
+          <n-skeleton height="20px" :repeat="3" style="margin-bottom: 8px;" />
+        </div>
+      </transition>
+    </n-card>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { FormInst } from 'naive-ui'
 import axios from 'axios'
+import { useMessage, NTag } from 'naive-ui'
 
+const message = useMessage()
 const route = useRoute()
+const router = useRouter()
 const petIdFromRoute = Number(route.params.id) || null
 const selectedPetId = ref<number | null>(petIdFromRoute)
 const formRef = ref<FormInst | null>(null)
+const scheduling = ref(false)
 
 // Formulário
 const form = ref({
   selectedVaccine: null as number | null,
-  scheduleDate: null as Date | null
+  scheduleDate: null as number | null
 })
 
 // Regras
 const rules = {
-  selectedVaccine: [{ required: true, message: 'Selecione uma vacina' }],
-  scheduleDate: [{ required: true, message: 'Escolha a data do agendamento' }]
+  selectedVaccine: [{ required: true, message: 'Selecione uma vacina', trigger: 'change' }],
+  scheduleDate: [{ required: true, message: 'Escolha a data do agendamento', trigger: 'change' }]
 }
 
 // Pet e vacinas
@@ -80,10 +130,20 @@ const selectedPet = ref<any>(null)
 const overdueVaccines = ref<any[]>([])
 const allVaccinesOptions = ref<{label: string, value: number}[]>([])
 
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(part => part.charAt(0))
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+}
+
 // Formatar data para exibir
 function formatDateBR(dateStr: string): string {
+  if (!dateStr) return 'Data não informada'
   const date = new Date(dateStr)
-  return `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}/${date.getFullYear()}`
+  return date.toLocaleDateString('pt-BR')
 }
 
 // Verificar vacina atrasada (>365 dias)
@@ -97,16 +157,20 @@ function isVaccineLate(vacDate: string): boolean {
 }
 
 // Bloquear datas passadas
-function disablePastDates(date: Date) {
+function disablePastDates(date: number) {
   const today = new Date()
   today.setHours(0,0,0,0)
-  return date < today
+  return date < today.getTime()
 }
 
 // Buscar dados do backend
 onMounted(async () => {
   const token = localStorage.getItem('token')
-  if (!token || !selectedPetId.value) return
+  if (!token || !selectedPetId.value) {
+    message.error('Token não encontrado ou ID do pet inválido')
+    router.push('/pets')
+    return
+  }
 
   try {
     // Pet
@@ -116,8 +180,14 @@ onMounted(async () => {
     selectedPet.value = resPet.data
 
     // Vacinas atrasadas
-    if (selectedPet.value.vacinas && Array.isArray(selectedPet.value.vacinas)) {
-      overdueVaccines.value = selectedPet.value.vacinas.filter((v: any) => isVaccineLate(v.date || v.data_aplicacao))
+    if (selectedPet.value.vacinas_aplicadas && Array.isArray(selectedPet.value.vacinas_aplicadas)) {
+      overdueVaccines.value = selectedPet.value.vacinas_aplicadas
+        .filter((v: any) => isVaccineLate(v.data_aplicacao))
+        .map((v: any) => ({
+          id: v.id,
+          name: v.vacina.nome,
+          date: v.data_aplicacao
+        }))
     }
 
     // Todas vacinas
@@ -132,22 +202,26 @@ onMounted(async () => {
 
   } catch (err) {
     console.error('Erro ao carregar dados do pet ou vacinas:', err)
+    message.error('Erro ao carregar dados do pet')
+    router.push('/pets')
   }
 })
 
 // Agendar vacina
 async function scheduleVaccination() {
   if (!selectedPetId.value || !formRef.value) return
+  
+  scheduling.value = true
   try {
     await formRef.value.validate()
 
     const token = localStorage.getItem('token')
     if (!token) {
-      alert('Você precisa estar logado!')
+      message.error('Você precisa estar logado!')
       return
     }
 
-    // ✅ Garante formato "YYYY-MM-DD" (aceito pelo backend Laravel)
+    //  Garantindo formato "YYYY-MM-DD" 
     const dataAgendadaFormatted = form.value.scheduleDate
       ? new Date(form.value.scheduleDate).toISOString().split('T')[0]
       : null
@@ -159,143 +233,254 @@ async function scheduleVaccination() {
       observacoes: null
     }
 
-    const res = await axios.post(
+    await axios.post(
       'http://127.0.0.1:8000/api/agendamento-de-vacinas',
       payload,
       { headers: { Authorization: `Bearer ${token}` } }
     )
 
-    alert('Vacinação agendada com sucesso!')
-
-    // ✅ Garante que o array vacinas exista antes de dar push
-    if (!selectedPet.value.vacinas || !Array.isArray(selectedPet.value.vacinas)) {
-      selectedPet.value.vacinas = []
-    }
-
-    // Atualizar lista local
-    const vacinaLabel = allVaccinesOptions.value.find(
-      v => v.value === payload.vacina_id
-    )?.label
-
-    selectedPet.value.vacinas.push({
-      id: res.data.id,
-      name: vacinaLabel,
-      date: dataAgendadaFormatted
-    })
-
-    overdueVaccines.value = selectedPet.value.vacinas.filter((v: any) =>
-      isVaccineLate(v.date)
-    )
-
+    message.success('Vacinação agendada com sucesso!')
+    
     // Limpar formulário
     form.value.selectedVaccine = null
     form.value.scheduleDate = null
 
+    router.push('/pets')
+
   } catch (err: any) {
     console.error('Erro ao agendar vacina:', err.response?.data || err)
-    alert(err.response?.data?.message || 'Erro ao agendar vacina')
+    message.error(err.response?.data?.message || 'Erro ao agendar vacina')
+  } finally {
+    scheduling.value = false
   }
+}
+
+function goBack() {
+  router.push('/pets')
 }
 
 </script>
 
-
 <style scoped>
-.schedule-card {
-  max-width: 600px;
-  margin: 40px auto; /* centraliza horizontal e deixa um espaço vertical */
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  background-color: #fff;
-
-  /* Centralizar verticalmente com flex */
+/* Container da página para centralização */
+.page-container {
   display: flex;
-  flex-direction: column;
   justify-content: center;
-  min-height: 80vh; /* ocupa quase toda a altura da tela */
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
-.form-section {
+/* Container principal CENTRALIZADO */
+.schedule-card {
+  width: 100%;
+  max-width: 600px;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  margin: 0 auto;
+}
+
+.loading-container {
+  padding: 40px 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
+}
+
+/* Cabeçalho do pet */
+.pet-header {
+  display: flex;
+  align-items: center;
   gap: 16px;
+  margin-bottom: 20px;
 }
 
-/* Lista de vacinas atrasadas */
-.vaccines-list {
-  list-style-type: none;
-  padding: 0;
+.pet-info {
+  flex: 1;
+}
+
+.pet-name {
   margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f2937;
 }
 
-.vaccine-item {
+.pet-species {
+  margin: 4px 0 0 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.custom-divider {
+  margin: 20px 0;
+}
+
+/* Formulário */
+.schedule-form {
+  width: 100%;
+}
+
+.form-item {
+  margin-bottom: 24px;
+}
+
+/* Vacinas Atrasadas */
+.overdue-section {
+  margin: 24px 0;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.vaccines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vaccine-card {
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.vaccine-card.overdue {
+  border-left: 4px solid #dc3545;
+}
+
+.vaccine-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-  font-size: 16px;
-  color: #555;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
+  padding: 12px;
+}
+
+.vaccine-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .vaccine-name {
-  font-weight: bold;
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 14px;
 }
 
 .vaccine-date {
-  font-style: italic;
-  color: #888;
+  color: #6b7280;
+  font-size: 12px;
 }
 
-.vaccine-status.red {
-  color: red;
-  font-weight: bold;
+.status-tag {
+  flex-shrink: 0;
 }
 
-.confirm-btn {
-  margin-top: 16px;
-  align-self: flex-start;
+/* Botões de ação */
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.action-btn {
   min-width: 180px;
 }
 
-/* RESPONSIVO */
-@media (max-width: 600px) {
-  .schedule-card {
-    max-width: 100%;
-    margin: 10px auto;
-    padding: 10px;
-    min-height: auto;
-  }
+/* Transição de fade */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
 
-  .form-section {
+/* RESPONSIVIDADE MOBILE */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 12px;
+    align-items: flex-start;
+  }
+  
+  .schedule-card {
+    margin: 0;
+    border-radius: 8px;
+    max-width: none;
+  }
+  
+  .pet-header {
+    flex-direction: column;
+    text-align: center;
     gap: 12px;
   }
-
-  /* Inputs, selects, datepicker e botão ocupam 100% */
-  n-select,
-  n-date-picker,
-  .confirm-btn {
-    width: 100%;
-  }
-
-  .vaccine-item {
+  
+  .vaccine-content {
     flex-direction: column;
     align-items: flex-start;
-    font-size: 14px;
+    gap: 8px;
   }
-
-  .vaccine-name,
-  .vaccine-date,
-  .vaccine-status.red {
-    font-size: 14px;
+  
+  .status-tag {
+    align-self: flex-start;
   }
+  
+  .action-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .action-btn {
+    width: 100%;
+    min-width: auto;
+  }
+}
 
-  .confirm-btn {
-    font-size: 14px;
-    padding: 12px 0;
+@media (max-width: 480px) {
+  .page-container {
+    padding: 8px;
+  }
+  
+  .schedule-card {
+    border-radius: 6px;
+  }
+  
+  .pet-name {
+    font-size: 20px;
+  }
+  
+  .section-title {
+    font-size: 16px;
+  }
+}
+
+/* Para telas muito pequenas */
+@media (max-width: 320px) {
+  .page-container {
+    padding: 4px;
+  }
+  
+  .pet-name {
+    font-size: 18px;
   }
 }
 </style>
-

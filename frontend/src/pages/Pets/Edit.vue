@@ -1,100 +1,204 @@
 <template>
-  <n-card title="Editar Pet" style="max-width: 600px; margin: 20px auto;">
-    <n-form :model="pet" :rules="rules" ref="formRef">
-      <!-- Dados do pet -->
-      <n-form-item label="Nome" path="name">
-        <n-input v-model:value="pet.name" placeholder="Digite o nome do pet" />
-      </n-form-item>
+  <n-card 
+    title="Editar Pet"
+    class="edit-pet-card"
+    :bordered="true"
+  >
+    <!-- Transição suave -->
+    <transition name="fade" mode="out-in">
+      <div v-if="pet.id" key="content">
+        <n-form :model="pet" :rules="rules" ref="formRef" class="pet-form">
+          <!-- Cabeçalho do Pet -->
+          <div class="pet-header">
+            <div class="pet-title">
+              <h2>Editar {{ pet.name }}</h2>
+              <p>Atualize as informações do seu pet</p>
+            </div>
+          </div>
 
-      <n-form-item label="Espécie" path="species">
-        <n-select
-          v-model:value="pet.species"
-          :options="speciesOptions"
-          placeholder="Selecione a espécie"
-        />
-      </n-form-item>
+          <n-divider class="custom-divider" />
 
-      <n-form-item label="Data de Nascimento" path="birthdate">
-        <n-date-picker
-        v-model:value="pet.birthdate"
-        type="date"
-        placeholder="Selecione a data de nascimento"
-        :disabled-date="disabledDate"
-        format="dd/MM/yyyy"
-        value-format="timestamp"
-/>
+          <!-- Informações Básicas -->
+          <div class="form-section">
+            <h3 class="section-title">Informações Básicas</h3>
+            <div class="form-grid">
+              <n-form-item label="Nome" path="name" class="form-item">
+                <n-input 
+                  v-model:value="pet.name" 
+                  placeholder="Digite o nome do pet"
+                  size="large"
+                />
+              </n-form-item>
 
-      </n-form-item>
+              <n-form-item label="Espécie" path="species" class="form-item">
+                <n-select
+                  v-model:value="pet.species"
+                  :options="speciesOptions"
+                  placeholder="Selecione a espécie"
+                  size="large"
+                />
+              </n-form-item>
 
-      <!-- Vacinas Aplicadas Recentes (somente exibição) -->
-      <n-divider>Vacinas Aplicadas Recentemente</n-divider>
-      <div v-if="vacinasRecentes.length">
-        <div v-for="vac in vacinasRecentes" :key="vac.id" class="recent-vaccine">
-          {{ vac.name }} - {{ formatarData(new Date(vac.date || 0).toISOString()) }}
-        </div>
+              <n-form-item label="Data de Nascimento" path="birthdate" class="form-item">
+                <n-date-picker
+                  v-model:value="pet.birthdate"
+                  type="date"
+                  placeholder="Selecione a data de nascimento"
+                  :disabled-date="disabledDate"
+                  format="dd/MM/yyyy"
+                  value-format="timestamp"
+                  size="large"
+                  style="width: 100%"
+                />
+              </n-form-item>
+            </div>
+          </div>
+
+          <!-- Vacinas Aplicadas Recentes -->
+          <div class="form-section">
+            <h3 class="section-title">Vacinas Aplicadas Recentemente</h3>
+            <div class="vaccines-grid" v-if="vacinasRecentes.length">
+              <n-card
+                v-for="vac in vacinasRecentes"
+                :key="vac.id"
+                class="vaccine-card"
+              >
+                <div class="vaccine-content">
+                  <span class="vaccine-name">{{ vac.name }}</span>
+                  <span class="vaccine-date">{{ formatarData(new Date(vac.date || 0).toISOString()) }}</span>
+                </div>
+              </n-card>
+            </div>
+            <n-empty v-else description="Nenhuma vacina recente" class="empty-state">
+              <template #extra>
+                <n-button size="small" @click="goToSchedule(pet.id)">
+                  Agendar Vacinação
+                </n-button>
+              </template>
+            </n-empty>
+          </div>
+
+          <!-- Vacinas Agendadas -->
+          <div class="form-section">
+            <h3 class="section-title">Vacinas Agendadas</h3>
+            <div class="vaccines-list" v-if="paginatedVacinasAgendadas.length">
+              <n-card
+                v-for="vac in paginatedVacinasAgendadas"
+                :key="vac.id"
+                class="vaccine-card scheduled"
+              >
+                <div class="vaccine-content">
+                  <div class="vaccine-info">
+                    <span class="vaccine-name">{{ vac.vacina.nome }}</span>
+                    <span class="vaccine-date">{{ formatarData(vac.data_agendada || vac.data_aplicacao) }}</span>
+                  </div>
+                  <n-button 
+                    type="error" 
+                    size="small" 
+                    @click="cancelVaccine(vac.id)"
+                    class="cancel-btn"
+                  >
+                    Cancelar
+                  </n-button>
+                </div>
+              </n-card>
+            </div>
+            <n-empty v-else description="Nenhuma vacina agendada" class="empty-state">
+              <template #extra>
+                <n-button size="small" @click="goToSchedule(pet.id)">
+                  Agendar Vacinação
+                </n-button>
+              </template>
+            </n-empty>
+
+            <!-- Paginação -->
+            <div v-if="totalPages > 1" class="pagination">
+              <n-button 
+                size="small" 
+                :disabled="currentPage === 1" 
+                @click="currentPage--"
+                class="page-btn"
+              >
+                Anterior
+              </n-button>
+              <span class="page-info">Página {{ currentPage }} de {{ totalPages }}</span>
+              <n-button 
+                size="small" 
+                :disabled="currentPage === totalPages" 
+                @click="currentPage++"
+                class="page-btn"
+              >
+                Próxima
+              </n-button>
+            </div>
+          </div>
+
+          <!-- Vacinas Atrasadas -->
+          <div class="form-section">
+            <h3 class="section-title">Vacinas Atrasadas</h3>
+            <div class="vaccines-list" v-if="vacinasAtrasadas.length">
+              <n-card
+                v-for="vac in vacinasAtrasadas"
+                :key="vac.id"
+                class="vaccine-card overdue"
+              >
+                <div class="vaccine-content">
+                  <div class="vaccine-info">
+                    <span class="vaccine-name">{{ vac.vacina.nome }}</span>
+                    <span class="vaccine-date">{{ formatarData(vac.data_aplicacao) }}</span>
+                  </div>
+                  <n-tag type="error" size="small" class="status-tag">
+                    Atrasada
+                  </n-tag>
+                </div>
+              </n-card>
+            </div>
+            <n-empty v-else description="Nenhuma vacina atrasada" class="empty-state" />
+          </div>
+
+          <!-- Botões de Ação -->
+          <div class="action-buttons">
+            <n-button 
+              type="primary" 
+              @click="savePet" 
+              size="large"
+              class="action-btn"
+              :loading="saving"
+            >
+              Salvar Alterações
+            </n-button>
+            <n-button 
+              @click="goBack" 
+              size="large"
+              class="action-btn"
+              :disabled="saving"
+            >
+              Cancelar
+            </n-button>
+              
+          </div>
+        </n-form>
       </div>
-      <n-empty v-else description="Nenhuma vacina recente." />
 
-      <!-- Vacinas Agendadas -->
-      <n-divider>Vacinas Agendadas</n-divider>
-      <n-table v-if="vacinasAgendadas.length" :data="vacinasAgendadas" :bordered="false" size="small">
-        <thead>
-          <tr>
-            <th>Nome da Vacina</th>
-            <th>Data Agendada</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="vac in vacinasAgendadas" :key="vac.id">
-            <td>{{ vac.vacina.nome }}</td>
-            <td>{{ formatarData(vac.data_agendada || vac.data_aplicacao) }}</td>
-            <td>
-              <n-button type="error" size="tiny" @click="cancelVaccine(vac.id)">Cancelar</n-button>
-            </td>
-          </tr>
-        </tbody>
-      </n-table>
-      <n-empty v-else description="Nenhuma vacina agendada." />
-
-      <!-- Vacinas Atrasadas -->
-      <n-divider>Vacinas Atrasadas</n-divider>
-      <n-table v-if="vacinasAtrasadas.length" :data="vacinasAtrasadas" :bordered="false" size="small">
-        <thead>
-          <tr>
-            <th>Nome da Vacina</th>
-            <th>Data Prevista</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="vac in vacinasAtrasadas" :key="vac.id">
-            <td>{{ vac.vacina.nome }}</td>
-            <td>{{ formatarData(vac.data_aplicacao) }}</td>
-          </tr>
-        </tbody>
-      </n-table>
-      <n-empty v-else description="Nenhuma vacina atrasada." />
-
-      <!-- Botões Salvar / Cancelar -->
-      <n-form-item>
-        <n-space>
-          <n-button type="primary" @click="savePet">Salvar</n-button>
-          <n-button @click="goBack">Cancelar</n-button>
-        </n-space>
-      </n-form-item>
-    </n-form>
+      <!-- Loading state -->
+      <div v-else key="loading" class="loading-container">
+        <n-skeleton height="32px" width="200px" style="margin-bottom: 20px;" />
+        <n-skeleton height="20px" :repeat="3" style="margin-bottom: 8px;" />
+      </div>
+    </transition>
   </n-card>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FormInst, FormRules } from 'naive-ui'
 import axios, { AxiosHeaders } from 'axios'
-import { useMessage } from 'naive-ui'
+import { useMessage, NTag, NEmpty } from 'naive-ui'
 
 const message = useMessage()
 const formRef = ref<FormInst | null>(null)
+const saving = ref(false)
 
 interface Vaccine {
   id: number
@@ -132,7 +236,7 @@ const pet = ref<Pet>({
 
 const vacinasAgendadas = ref<VacinaAgendada[]>([])
 const vacinasAtrasadas = ref<VacinaAgendada[]>([])
-const vacinasRecentes = ref<Vaccine[]>([]) // vacinas aplicadas recentemente
+const vacinasRecentes = ref<Vaccine[]>([])
 
 const speciesOptions = [
   { label: 'Cachorro', value: 'Cachorro' },
@@ -155,6 +259,14 @@ api.interceptors.request.use(config => {
 const route = useRoute()
 const router = useRouter()
 
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(part => part.charAt(0))
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+}
 
 function parseVaccines(data: any[]): Vaccine[] {
   return data.map(v => ({
@@ -168,24 +280,10 @@ const rules: FormRules = {
   name: [{ required: true, message: 'Nome é obrigatório', trigger: 'blur' }],
   species: [{ required: true, message: 'Espécie é obrigatória', trigger: 'change' }],
   birthdate: [
-  {
-    required: true,
-    validator: (rule, value) => {
-      if (!value || value <= 0) return new Error('Data de nascimento é obrigatória')
-      return true
-    },
-    trigger: 'change'
-  }
-], 
-  vaccines: [
-    { required: true, type: 'array', message: 'Adicione pelo menos uma vacina', trigger: 'change' },
     {
+      required: true,
       validator: (rule, value) => {
-        if (!value || !value.length) return new Error('Adicione pelo menos uma vacina')
-        for (const v of value) {
-          if (!v.name) return new Error('Nome da vacina é obrigatório')
-          if (!v.date) return new Error('Data da vacina é obrigatória')
-        }
+        if (!value || value <= 0) return new Error('Data de nascimento é obrigatória')
         return true
       },
       trigger: 'change'
@@ -200,7 +298,7 @@ async function fetchPet() {
   if (!petId) { message.error('ID do pet inválido.'); router.push('/pets'); return }
 
   try {
-    const { data } = await api.get(`/pets/${petId}`)
+    const { data } = await api.get(`http://localhost:8000/api/pets/${petId}`)
     pet.value = {
       id: data.id,
       name: data.name,
@@ -218,7 +316,7 @@ async function fetchPet() {
 
 async function fetchVacinas() {
   try {
-    const { data } = await api.get('/vacinas')
+    const { data } = await api.get('http://localhost:8000/api/vacinas')
     const items = Array.isArray(data.items) ? data.items : []
     vacinasDisponiveis.value = items.map((v: VacinaDisponivel) => ({ label: v.nome, value: v.id }))
   } catch (err) {
@@ -258,8 +356,20 @@ function separarVacinas(vacinasAplicadas: any[], vacinasAgendar: any[]) {
   })
 }
 
+// PAGINAÇÃO DE VACINAS AGENDADAS
+const currentPage = ref(1)
+const perPage = ref(5)
+const totalPages = computed(() => Math.ceil(vacinasAgendadas.value.length / perPage.value))
+const paginatedVacinasAgendadas = computed(() => {
+  const start = (currentPage.value - 1) * perPage.value
+  return vacinasAgendadas.value.slice(start, start + perPage.value)
+})
+watch(vacinasAgendadas, () => { currentPage.value = 1 })
+
 async function savePet() {
   if (!formRef.value) return
+  saving.value = true
+  
   try {
     await formRef.value.validate()
 
@@ -270,48 +380,28 @@ async function savePet() {
     }
 
     const birthdate = pet.value.birthdate
-    ? new Date(pet.value.birthdate).toISOString().split('T')[0]
-    : null
+      ? new Date(pet.value.birthdate).toISOString().split('T')[0]
+      : null
 
-
-    await api.put(`/pets/${pet.value.id}`, {
+    await api.put(`http://localhost:8000/api/pets/${pet.value.id}`, {
       name: pet.value.name,
       species: pet.value.species,
       birthdate
     })
 
-    const hoje = new Date().setHours(0, 0, 0, 0)
-
-    for (const vacina of pet.value.vaccines) {
-      if (!vacina.name || !vacina.date) continue
-
-      const vacinaTime = new Date(vacina.date).setHours(0, 0, 0, 0)
-      const dataISO = new Date(vacina.date).toISOString().split('T')[0]
-
-      const payload = {
-        pet_id: pet.value.id,
-        vacina_id: vacina.name,
-        observacoes: null,
-        data_aplicacao: vacinaTime <= hoje ? dataISO : null,
-        data_agendada: dataISO // sempre envia
-      }
-
-      await api.post('/agendamento-de-vacinas', payload)
-    }
-
-    message.success('Pet e vacinas salvos com sucesso!')
+    message.success('Pet atualizado com sucesso!')
     router.push('/pets')
   } catch (err: any) {
     console.error('Erro ao salvar pet:', err.response?.data || err)
     message.error(err.response?.data?.message || 'Erro ao salvar pet.')
+  } finally {
+    saving.value = false
   }
 }
 
-
-
 async function cancelVaccine(vacId: number) {
   try {
-    await api.delete(`/agendamento-de-vacinas/${vacId}`)
+    await api.delete(`http://localhost:8000/api/agendamento-de-vacinas/${vacId}`)
     vacinasAgendadas.value = vacinasAgendadas.value.filter(v => v.id !== vacId)
     message.success('Vacina cancelada com sucesso!')
   } catch (err) {
@@ -321,6 +411,9 @@ async function cancelVaccine(vacId: number) {
 }
 
 function goBack() { router.push('/pets') }
+function goToSchedule(petId: number) {
+  router.push(`/schedule/${petId}`)
+}
 function formatarData(date: string): string { return new Date(date).toLocaleDateString('pt-BR') }
 
 onMounted(() => {
@@ -330,63 +423,275 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.vaccine-fields {
+/* Container da página - APENAS ESPAÇAMENTO */
+.page-container {
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Container principal - APENAS O CONTEÚDO */
+.edit-pet-card {
+  width: 100%;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  background-color: #fff;
+  /* Sem height fixo - altura automática pelo conteúdo */
+}
+
+.loading-container {
+  padding: 40px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Cabeçalho do pet */
+.pet-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.pet-title h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.pet-title p {
+  margin: 4px 0 0 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.custom-divider {
+  margin: 20px 0;
+}
+
+/* Formulário */
+.pet-form {
+  width: 100%;
+}
+
+.form-section {
+  margin-bottom: 32px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.form-item {
+  margin-bottom: 0;
+}
+
+/* Vacinas */
+.vaccines-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.vaccines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vaccine-card {
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.vaccine-card.scheduled {
+  border-left: 4px solid #007bff;
+}
+
+.vaccine-card.overdue {
+  border-left: 4px solid #dc3545;
+}
+
+.vaccine-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.vaccine-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vaccine-name {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.vaccine-date {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.cancel-btn {
+  flex-shrink: 0;
+}
+
+.status-tag {
+  flex-shrink: 0;
+}
+
+.empty-state {
+  margin: 20px 0;
+}
+
+/* Paginação */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 16px 0;
+}
+
+.page-info {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.page-btn {
+  min-width: 80px;
+}
+
+/* Botões de ação */
+.action-buttons {
   display: flex;
   gap: 12px;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  justify-content: flex-end;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #f0f0f0;
 }
 
-.vaccine-fields > * {
-  flex: 1 1 200px;
-  min-width: 120px;
+.action-btn {
+  min-width: 140px;
 }
 
-.recent-vaccine {
-  padding: 4px 0;
+/* Transição de fade */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 
-@media (max-width: 600px) {
-  n-card {
-    max-width: 100%;
-    margin: 10px;
-    padding: 10px;
+/* RESPONSIVIDADE MOBILE */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 12px;
   }
-
-  .vaccine-fields {
+  
+  .edit-pet-card {
+    border-radius: 8px;
+  }
+  
+  .pet-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .vaccines-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .vaccine-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .cancel-btn, .status-tag {
+    align-self: flex-start;
+  }
+  
+  .action-buttons {
     flex-direction: column;
     gap: 8px;
   }
-
-  .vaccine-fields > * {
-    flex: 1 1 100%;
-  }
-
-  .remove-btn {
+  
+  .action-btn {
     width: 100%;
-    height: auto !important;
-    padding: 10px 0;
-    font-size: 14px;
+    min-width: auto;
   }
-
-  n-button[type="dashed"] {
-    width: 100%;
-    padding: 12px;
-    font-size: 14px;
+  
+  .pagination {
+    flex-direction: column;
+    gap: 12px;
   }
-
-  .n-form-item {
+  
+  .page-btn {
     width: 100%;
   }
+}
 
-  .n-input, .n-select, .n-input-number {
-    width: 100%;
+@media (max-width: 480px) {
+  .page-container {
+    padding: 8px;
   }
+  
+  .edit-pet-card {
+    border-radius: 6px;
+  }
+  
+  .pet-title h2 {
+    font-size: 20px;
+  }
+  
+  .section-title {
+    font-size: 16px;
+  }
+}
 
-  n-button {
-    width: 100%;
-    font-size: 14px;
-    padding: 12px;
+/* Para telas muito pequenas */
+@media (max-width: 320px) {
+  .page-container {
+    padding: 4px;
+  }
+  
+  .pet-title h2 {
+    font-size: 18px;
   }
 }
 </style>

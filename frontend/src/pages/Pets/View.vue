@@ -1,50 +1,158 @@
 <template>
-  <n-card title="Detalhes do Pet" class="pet-detail-card">
-    <div v-if="pet">
-      <h2>{{ pet.name }}</h2>
-      <p><strong>Espécie:</strong> {{ pet.species }}</p>
-      <p><strong>Data de Nascimento:</strong> {{ formatDateBR(pet.birthdate) }}</p>
+  <n-card 
+    title="Detalhes do Pet"
+    class="pet-detail-card"
+    :bordered="true"
+  >
+    <!-- Transição suave -->
+    <transition name="fade" mode="out-in">
+      <div v-if="pet" key="content">
+        <!-- Informações do Pet -->
+        <div class="pet-header">
+          
+          <div class="pet-info">
+            <h2 class="pet-name">{{ pet.name }}</h2>
+            <p class="pet-species">{{ pet.species }}</p>
+          </div>
+        </div>
 
-      <div class="vaccines-section">
+        <n-divider class="custom-divider" />
+
+        <!-- Informações básicas -->
+        <div class="basic-info">
+          <div class="info-item">
+            <span class="info-label">Nome</span>
+            <span class="info-value">{{ pet.name }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Espécie</span>
+            <span class="info-value">{{ pet.species }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Data de Nascimento</span>
+            <span class="info-value">{{ formatDateBR(pet.birthdate) }}</span>
+          </div>
+        </div>
+
         <!-- Vacinas Aplicadas -->
-        <h3>Vacinas Aplicadas</h3>
-        <ul class="vaccines-list" v-if="vacinasAplicadas.length">
-          <li v-for="vacina in vacinasAplicadas" :key="vacina.id" class="vaccine-item">
-            <span class="vaccine-name">{{ vacina.vacina.nome }}</span>
-            <span class="vaccine-date">{{ formatDateBR(vacina.data_aplicacao) }}</span>
-            <span
-              class="vaccine-status"
-              :class="isVacinaAtrasada(vacina) ? 'red' : 'green'"
+        <div class="vaccines-section">
+          <h3 class="section-title">Vacinas Aplicadas</h3>
+          <div class="vaccines-list" v-if="vacinasAplicadas.length">
+            <n-card
+              v-for="vacina in vacinasAplicadas"
+              :key="vacina.id"
+              class="vaccine-card"
             >
-              {{ isVacinaAtrasada(vacina) ? 'Atrasada' : 'Em Dia' }}
-            </span>
-          </li>
-        </ul>
-        <p v-else>Nenhuma vacina aplicada.</p>
+              <div class="vaccine-content">
+                <div class="vaccine-info">
+                  <span class="vaccine-name">{{ vacina.vacina.nome }}</span>
+                  <span class="vaccine-date">{{ formatDateBR(vacina.data_aplicacao) }}</span>
+                </div>
+                <n-tag 
+                  :type="isVacinaAtrasada(vacina) ? 'error' : 'success'"
+                  size="small"
+                  class="status-tag"
+                >
+                  {{ isVacinaAtrasada(vacina) ? 'Atrasada' : 'Em Dia' }}
+                </n-tag>
+              </div>
+              <div v-if="vacina.data_proxima_dose" class="next-dose">
+                <span class="next-dose-label">Próxima dose:</span>
+                <span class="next-dose-date">{{ formatDateBR(vacina.data_proxima_dose) }}</span>
+              </div>
+            </n-card>
+          </div>
+          <n-empty v-else description="Nenhuma vacina aplicada" class="empty-state">
+            <template #extra>
+              <n-button size="small" @click="goToSchedule(pet.id)">
+                Agendar Vacinação
+              </n-button>
+            </template>
+          </n-empty>
+        </div>
 
         <!-- Vacinas Agendadas -->
-        <h3>Vacinas Agendadas</h3>
-        <ul class="vaccines-list" v-if="vacinasAgendadas.length">
-          <li v-for="vacina in vacinasAgendadas" :key="vacina.id" class="vaccine-item">
-            <span class="vaccine-name">{{ vacina.vacina.nome }}</span>
-            <span class="vaccine-date">{{ formatDateBR(vacina.data_agendada) }}</span>
-            <span class="vaccine-status blue">Agendada</span>
-          </li>
-        </ul>
-        <p v-else>Nenhuma vacina agendada.</p>
-      </div>
-    </div>
+        <div class="vaccines-section">
+          <h3 class="section-title">Vacinas Agendadas</h3>
+          <div class="vaccines-list" v-if="paginatedVacinasAgendadas.length">
+            <n-card
+              v-for="vacina in paginatedVacinasAgendadas"
+              :key="vacina.id"
+              class="vaccine-card"
+            >
+              <div class="vaccine-content">
+                <div class="vaccine-info">
+                  <span class="vaccine-name">{{ vacina.vacina.nome }}</span>
+                  <span class="vaccine-date">{{ formatDateBR(vacina.data_agendada) }}</span>
+                </div>
+                <n-tag type="info" size="small" class="status-tag">
+                  Agendada
+                </n-tag>
+              </div>
+            </n-card>
+          </div>
+          <n-empty v-else description="Nenhuma vacina agendada" class="empty-state">
+            <template #extra>
+              <n-button size="small" @click="goToSchedule(pet.id)">
+                Agendar Vacinação
+              </n-button>
+            </template>
+          </n-empty>
 
-    <div class="back-btn-wrapper">
-      <n-button @click="goBack" type="primary">Voltar</n-button>
-    </div>
+          <!-- Paginação -->
+          <div v-if="totalPages > 1" class="pagination">
+            <n-button
+              size="small"
+              :disabled="currentPage === 1"
+              @click="currentPage--"
+              class="page-btn"
+            >
+              Anterior
+            </n-button>
+            <span class="page-info">Página {{ currentPage }} de {{ totalPages }}</span>
+            <n-button
+              size="small"
+              :disabled="currentPage === totalPages"
+              @click="currentPage++"
+              class="page-btn"
+            >
+              Próxima
+            </n-button>
+          </div>
+        </div>
+
+        <!-- Botões de ação -->
+        <div class="action-buttons">
+          <n-button @click="goToEdit(pet.id)" type="primary" class="action-btn">
+            Editar Pet
+          </n-button>
+          <n-button @click="goToSchedule(pet.id)" type="primary" class="action-btn">
+            Agendar Vacinação
+          </n-button>
+          <n-button @click="goBack" class="action-btn">
+            Voltar
+          </n-button>
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div v-else key="loading" class="loading-container">
+        <n-skeleton height="32px" width="200px" style="margin-bottom: 20px;" />
+        <n-skeleton height="20px" :repeat="3" style="margin-bottom: 8px;" />
+      </div>
+    </transition>
   </n-card>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import { useMessage, NTag, NEmpty } from 'naive-ui'
+
+const message = useMessage()
+const route = useRoute()
+const router = useRouter()
 
 interface Vacina {
   id: number
@@ -73,13 +181,30 @@ interface Pet {
   vacinas_agendadas?: VacinaAgendada[]
 }
 
-const route = useRoute()
-const router = useRouter()
 const pet = ref<Pet | null>(null)
 const vacinasAplicadas = ref<VacinaAplicada[]>([])
 const vacinasAgendadas = ref<VacinaAgendada[]>([])
+const loading = ref(true)
 
-// Buscar dados do pet
+const currentPage = ref(1)
+const perPage = ref(5)
+
+// Paginação local
+const totalPages = computed(() => Math.ceil(vacinasAgendadas.value.length / perPage.value))
+const paginatedVacinasAgendadas = computed(() => {
+  const start = (currentPage.value - 1) * perPage.value
+  return vacinasAgendadas.value.slice(start, start + perPage.value)
+})
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(part => part.charAt(0))
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+}
+
 // Buscar dados do pet
 async function fetchPet() {
   try {
@@ -97,115 +222,357 @@ async function fetchPet() {
       vacinas_agendadas: data.vacinas_agendadas || data.agendamentos || []
     }
 
-    // ✅ Protege contra null
     vacinasAplicadas.value = pet.value?.vacinas_aplicadas ?? []
     vacinasAgendadas.value = pet.value?.vacinas_agendadas ?? []
 
+    // Resetar página se necessário
+    currentPage.value = 1
+
   } catch (error) {
     console.error('Erro ao buscar pet:', error)
+    message.error('Erro ao carregar dados do pet.')
+  } finally {
+    setTimeout(() => (loading.value = false), 300)
   }
 }
-
-
 
 // Verifica se a vacina está atrasada
 function isVacinaAtrasada(vacina: VacinaAplicada): boolean {
   if (!vacina.data_aplicacao) return false
 
-  const hoje = new Date().setHours(0, 0, 0, 0)
   const dataAplicacao = new Date(vacina.data_aplicacao).setHours(0, 0, 0, 0)
-
-  // Data limite de 1 ano atrás
   const umAnoAtras = new Date()
   umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1)
   umAnoAtras.setHours(0, 0, 0, 0)
 
-  // Vacina é considerada atrasada se foi aplicada há mais de 1 ano
   return dataAplicacao <= umAnoAtras.getTime()
 }
 
-
-
 // Formatar data
 function formatDateBR(dateStr: string): string {
-  if (!dateStr) return ''
+  if (!dateStr) return 'Não informada'
   const date = new Date(dateStr)
-  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`
+  return date.toLocaleDateString('pt-BR')
 }
 
 function goBack() {
   router.back()
 }
 
+function goToEdit(petId: number) {
+  router.push(`/pets/edit/${petId}`)
+}
+
+function goToSchedule(petId: number) {
+  router.push(`/schedule/${petId}`)
+}
+
 onMounted(fetchPet)
 </script>
 
-
 <style scoped>
-.pet-detail-card {
-  max-width: 600px;
-  margin: 20px auto;
+/* Container da página - APENAS ESPAÇAMENTO */
+.page-container {
   padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  box-sizing: border-box;
+}
+
+/* Container principal - APENAS O CONTEÚDO */
+.pet-detail-card {
+  width: 100%;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   background-color: #fff;
+  /* Sem height fixo - altura automática pelo conteúdo */
 }
 
+.loading-container {
+  padding: 40px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Cabeçalho do pet */
+.pet-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.pet-info {
+  flex: 1;
+}
+
+.pet-name {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.pet-species {
+  margin: 4px 0 0 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.custom-divider {
+  margin: 20px 0;
+}
+
+/* Informações básicas */
+.basic-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.info-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-value {
+  font-size: 14px;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+/* Seções de vacinas */
 .vaccines-section {
-  margin-top: 20px;
+  margin-bottom: 24px;
 }
 
-.vaccines-section h3 {
+.section-title {
   font-size: 18px;
-  margin: 10px 0 5px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f0f0f0;
 }
 
 .vaccines-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.vaccine-item {
+.vaccine-card {
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.vaccine-content {
   display: flex;
+  justify-content: between;
   align-items: center;
-  margin-bottom: 8px;
-  font-size: 16px;
-  color: #555;
+  gap: 12px;
+}
+
+.vaccine-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .vaccine-name {
-  font-weight: bold;
-  margin-right: 10px;
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 14px;
 }
 
 .vaccine-date {
-  margin-right: 10px;
+  color: #6b7280;
+  font-size: 12px;
 }
 
-.vaccine-status {
-  font-weight: bold;
+.status-tag {
+  flex-shrink: 0;
 }
-.vaccine-status.green { color: green; }
-.vaccine-status.red { color: rgb(230,34,34); }
-.vaccine-status.blue { color: #007BFF; }
 
-.back-btn-wrapper {
+.next-dose {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.next-dose-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.next-dose-date {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.empty-state {
+  margin: 20px 0;
+}
+
+/* Paginação */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
   margin-top: 20px;
-  text-align: right;
+  padding: 16px 0;
 }
 
+.page-info {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.page-btn {
+  min-width: 80px;
+}
+
+/* Botões de ação */
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.action-btn {
+  min-width: 120px;
+}
+
+/* Transição de fade */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* RESPONSIVIDADE MOBILE */
 @media (max-width: 768px) {
-  .back-btn-wrapper {
-    text-align: center;
+  .page-container {
+    padding: 12px;
   }
-  .vaccine-item {
+  
+  .pet-detail-card {
+    border-radius: 8px;
+  }
+  
+  .pet-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+  
+  .basic-info {
+    gap: 12px;
+  }
+  
+  .info-label {
+    font-size: 11px;
+  }
+  
+  .info-value {
+    font-size: 13px;
+  }
+  
+  .vaccine-content {
     flex-direction: column;
     align-items: flex-start;
-    font-size: 14px;
+    gap: 8px;
   }
-  .vaccine-name, .vaccine-date, .vaccine-status {
-    margin: 2px 0;
+  
+  .status-tag {
+    align-self: flex-start;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .action-btn {
+    width: 100%;
+    min-width: auto;
+  }
+  
+  .pagination {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .page-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-container {
+    padding: 8px;
+  }
+  
+  .pet-detail-card {
+    border-radius: 6px;
+  }
+  
+  .pet-name {
+    font-size: 20px;
+  }
+  
+  .info-label {
+    font-size: 10px;
+  }
+  
+  .info-value {
+    font-size: 12px;
+  }
+  
+  .section-title {
+    font-size: 16px;
+  }
+}
+
+/* Para telas muito pequenas */
+@media (max-width: 320px) {
+  .page-container {
+    padding: 4px;
+  }
+  
+  .pet-name {
+    font-size: 18px;
   }
 }
 </style>
