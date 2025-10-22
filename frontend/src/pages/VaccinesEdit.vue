@@ -1,7 +1,6 @@
 <template>
   <div class="page-container">
     <n-card 
-      title="Editar Vacina"
       class="edit-vaccine-card"
       :bordered="true"
     >

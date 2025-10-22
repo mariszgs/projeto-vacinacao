@@ -297,6 +297,12 @@ async function saveProfile() {
 </script>
 
 <style scoped>
+/* Wrapper para garantir margens seguras */
+.page-wrapper {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 /* Container principal */
 .profile-card {
   max-width: 600px;
@@ -304,6 +310,7 @@ async function saveProfile() {
   border: 1px solid #e8e8e8;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-sizing: border-box; /* IMPORTANTE: inclui padding e border na largura */
 }
 
 .loading-container {
@@ -430,12 +437,23 @@ async function saveProfile() {
   transform: translateY(-10px);
 }
 
-/*  RESPONSIVIDADE MOBILE  */
+/* RESPONSIVIDADE MOBILE */
 @media (max-width: 768px) {
+  .page-wrapper {
+    padding: 0 12px; /* Margens seguras nas laterais */
+  }
+  
   .profile-card {
-    margin: 12px;
+    margin: 12px 0; /* Remove margens laterais, usa apenas do wrapper */
     max-width: none;
+    width: 100%; /* Ocupa 100% do espaço disponível no wrapper */
     border-radius: 8px;
+    box-sizing: border-box;
+  }
+  
+  /* Garante que o conteúdo interno também respeite os limites */
+  .profile-card :deep(.n-card__content) {
+    padding: 16px;
   }
   
   /* Esconde o n-descriptions no mobile */
@@ -489,9 +507,17 @@ async function saveProfile() {
 }
 
 @media (max-width: 480px) {
+  .page-wrapper {
+    padding: 0 8px; /* Menos padding em telas muito pequenas */
+  }
+  
   .profile-card {
-    margin: 8px;
+    margin: 8px 0;
     border-radius: 6px;
+  }
+  
+  .profile-card :deep(.n-card__content) {
+    padding: 14px;
   }
   
   .user-info .user-name {
@@ -521,8 +547,16 @@ async function saveProfile() {
 
 /* Para telas muito pequenas */
 @media (max-width: 320px) {
+  .page-wrapper {
+    padding: 0 4px;
+  }
+  
   .profile-card {
-    margin: 4px;
+    margin: 4px 0;
+  }
+  
+  .profile-card :deep(.n-card__content) {
+    padding: 12px;
   }
   
   .user-info .user-name {
@@ -535,6 +569,17 @@ async function saveProfile() {
   
   .info-item {
     padding: 8px;
+  }
+}
+
+/* Garante que não haja overflow horizontal em nenhum caso */
+@media (max-width: 768px) {
+  .page-wrapper {
+    overflow-x: hidden;
+  }
+  
+  .profile-card {
+    overflow: hidden;
   }
 }
 </style>
