@@ -4,7 +4,6 @@
       class="add-vaccine-card"
       :bordered="true"
     >
-      <!-- Transição suave -->
       <transition name="fade" mode="out-in">
         <n-form ref="formRef" :model="form" :rules="rules" label-placement="top" size="large" class="vaccine-form">
           
@@ -22,31 +21,31 @@
           <div class="form-section">
             <div class="form-grid">
               <!-- Nome da Vacina -->
-              <n-form-item label="Nome da Vacina" path="name" class="form-item">
+              <n-form-item label="Nome da Vacina" path="nome" class="form-item">
                 <n-input 
-                  v-model:value="form.name" 
+                  v-model:value="form.nome" 
                   placeholder="Digite o nome da vacina"
                   size="large"
                 />
               </n-form-item>
 
               <!-- Descrição -->
-              <n-form-item label="Descrição" path="description" class="form-item full-width">
+              <n-form-item label="Descrição" path="descricao" class="form-item full-width">
                 <n-input
                   type="textarea"
-                  v-model:value="form.description"
-                  placeholder="Descreva a vacina"
+                  v-model:value="form.descricao"
+                  placeholder="Descreva a vacina (opcional)"
                   :rows="4"
                   size="large"
                 />
               </n-form-item>
 
               <!-- Data de Validade -->
-              <n-form-item label="Data de Validade" path="expirationDate" class="form-item">
+              <n-form-item label="Data de Validade" path="validade" class="form-item">
                 <n-date-picker
-                  v-model:value="form.expirationDate"
+                  v-model:value="form.validade"
                   type="date"
-                  value-format="timestamp"
+                  value-format="yyyy-MM-dd" 
                   placeholder="Selecione a data de validade"
                   :disabled-date="disablePastDates"
                   format="dd/MM/yyyy"
@@ -95,18 +94,30 @@ const formRef = ref<FormInst | null>(null)
 const submitting = ref(false)
 
 const form = reactive({
-  name: '',
-  description: '',
-  expirationDate: null as number | null // timestamp
+  nome: '',
+  descricao: '',
+  validade: null as string | null // string no formato YYYY-MM-DD
 })
 
+// Regras de validação 
 const rules = {
-  name: [
-    { required: true, message: 'O nome da vacina é obrigatório', trigger: 'blur' }
+  nome: [
+    { 
+      required: true, 
+      message: 'O nome da vacina é obrigatório', 
+      trigger: ['blur', 'input'] 
+    }
   ],
-  description: [
-    { required: true, message: 'A descrição é obrigatória', trigger: 'blur' }
-  ],
+  validade: [
+    { 
+      required: true, 
+      message: 'A data de validade é obrigatória', 
+      trigger: ['blur', 'change'],
+      validator: (rule: any, value: string | null) => {
+        return !!value // Validação simples se tem valor
+      }
+    }
+  ]
 }
 
 function disablePastDates(date: number) {
@@ -115,51 +126,72 @@ function disablePastDates(date: number) {
   return date < today.getTime()
 }
 
-// converte timestamp para YYYY-MM-DD
-function formatDateForBackend(timestamp: number) {
-  const date = new Date(timestamp)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 async function submitForm() {
   if (!formRef.value) return
 
   submitting.value = true
   try {
+    // Valida o formulário
     await formRef.value.validate()
+    const payload = {
+      nome: form.nome.trim(),
+      descricao: form.descricao.trim() || null,
+      validade: form.validade
+      ? new Date(form.validade).toISOString().slice(0, 10)
+      : null
+}
 
-    const payload: any = {
-      nome: form.name,
-      descricao: form.description,
-    }
-
-    if (form.expirationDate != null) {
-      payload.validade = formatDateForBackend(form.expirationDate)
+    if (!payload.validade) {
+      message.error('Selecione uma data de validade')
+      submitting.value = false
+      return
     }
 
     const token = localStorage.getItem('token')
     if (!token) {
       message.error('Usuário não autenticado.')
+      submitting.value = false
       return
     }
 
-    await axios.post('http://localhost:8000/api/vacinas', payload, {
+    const response = await axios.post('http://localhost:8000/api/vacinas', payload, {
       headers: {
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       }
     })
 
-    message.success(`Vacina "${form.name}" cadastrada com sucesso!`)
-    cancel()
+
+    message.success(`Vacina "${form.nome}" cadastrada com sucesso!`)
+    
+    // Redireciona após sucesso
+    setTimeout(() => {
+      router.push('/vaccines')
+    }, 1000)
+    
   } catch (error: any) {
     console.error('Erro ao salvar vacina:', error)
-    if (error.response?.status === 401) {
-      message.error('Não autorizado. Verifique seu token.')
+    
+    // Tratamento específico para erro de validação
+    if (error.response?.status === 422) {
+      const validationErrors = error.response.data.errors
+      console.log('Erros de validação:', validationErrors)
+      
+      if (validationErrors.validade) {
+        message.error(validationErrors.validade[0])
+      } else if (validationErrors.nome) {
+        message.error(validationErrors.nome[0])
+      } else {
+        message.error('Erro de validação nos dados')
+      }
+    } else if (error.response?.status === 401) {
+      message.error('Sessão expirada. Faça login novamente.')
+      router.push('/login')
+    } else if (error.response?.data?.message) {
+      message.error(error.response.data.message)
     } else {
-      message.error('Erro ao cadastrar vacina.')
+      message.error('Erro ao cadastrar vacina. Tente novamente.')
     }
   } finally {
     submitting.value = false
@@ -172,58 +204,40 @@ function cancel() {
 </script>
 
 <style scoped>
-/* Container da página - APENAS ESPAÇAMENTO */
 .page-container {
   padding: 20px;
-  box-sizing: border-box;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  min-height: 100vh;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
-/* Container principal */
 .add-vaccine-card {
-  width: 100%;
-  max-width: 600px;
-  border: 1px solid #e8e8e8;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  background-color: #fff;
 }
 
-/* Cabeçalho do formulário */
 .form-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .form-title-content {
-  flex: 1;
+  text-align: center;
 }
 
 .form-title {
-  margin: 0;
+  margin: 0 0 8px 0;
   font-size: 24px;
   font-weight: 600;
   color: #1f2937;
 }
 
 .form-subtitle {
-  margin: 4px 0 0 0;
-  color: #6b7280;
+  margin: 0;
   font-size: 14px;
+  color: #6b7280;
 }
 
 .custom-divider {
-  margin: 20px 0;
-}
-
-/* Formulário */
-.vaccine-form {
-  width: 100%;
+  margin: 24px 0;
 }
 
 .form-section {
@@ -233,7 +247,7 @@ function cancel() {
 .form-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 20px;
+  gap: 24px;
 }
 
 .form-item {
@@ -244,86 +258,50 @@ function cancel() {
   grid-column: 1 / -1;
 }
 
-/* Botões de ação */
 .action-buttons {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid #f0f0f0;
+  flex-wrap: wrap;
 }
 
 .action-btn {
   min-width: 160px;
 }
 
-/* Transição de fade */
+/* Transições */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
+
 .fade-enter-from {
   opacity: 0;
   transform: translateY(10px);
 }
+
 .fade-leave-to {
   opacity: 0;
   transform: translateY(-10px);
 }
 
-/*  RESPONSIVIDADE MOBILE */
+/* Responsividade */
 @media (max-width: 768px) {
   .page-container {
     padding: 12px;
-    align-items: flex-start;
-  }
-  
-  .add-vaccine-card {
-    margin: 0;
-    border-radius: 8px;
-    max-width: none;
-  }
-  
-  .form-header {
-    flex-direction: column;
-    text-align: center;
-    gap: 12px;
   }
   
   .action-buttons {
     flex-direction: column;
-    gap: 8px;
   }
   
   .action-btn {
     width: 100%;
     min-width: auto;
   }
-}
-
-@media (max-width: 480px) {
-  .page-container {
-    padding: 8px;
-  }
   
-  .add-vaccine-card {
-    border-radius: 6px;
-  }
-  
-  .form-title {
-    font-size: 20px;
-  }
-}
-
-/* Para telas muito pequenas */
-@media (max-width: 320px) {
-  .page-container {
-    padding: 4px;
-  }
-  
-  .form-title {
-    font-size: 18px;
+  .form-grid {
+    gap: 16px;
   }
 }
 </style>
