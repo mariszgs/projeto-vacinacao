@@ -115,14 +115,27 @@ const api = axios.create({
 // Buscar pets do backend com paginação
 async function fetchPets(page = 1) {
   try {
+    loading.value = true;
+    
     const response = await api.get("/pets", {
-      params: { limit: perPage.value, page },
+      params: { 
+        per_page: perPage.value, // Mudei de 'limit' para 'per_page' (padrão Laravel)
+        page 
+      },
     });
 
     let petsArray: any[] = [];
-    if (Array.isArray(response.data.items)) {
-      petsArray = response.data.items;
-      totalPets.value = response.data.count;
+    let totalCount = 0;
+
+    // Laravel Resource com paginação
+    if (response.data.data && Array.isArray(response.data.data)) {
+      petsArray = response.data.data;
+      totalCount = response.data.meta?.total || response.data.total || 0;
+    } 
+    // Estrutura alternativa (sem paginação)
+    else if (Array.isArray(response.data)) {
+      petsArray = response.data;
+      totalCount = response.data.length;
     }
 
     pets.value = petsArray
@@ -132,12 +145,13 @@ async function fetchPets(page = 1) {
       }))
       .sort((a, b) => a.id - b.id);
 
+    totalPets.value = totalCount;
     currentPage.value = page;
+
   } catch (error) {
     console.error("Erro ao buscar pets:", error);
     message.error("Erro ao carregar pets.");
   } finally {
-    // pequeno delay pro fade suave 🩵
     setTimeout(() => (loading.value = false), 400);
   }
 }
@@ -244,13 +258,13 @@ onMounted(() => fetchPets());
 </script>
 
 <style scoped>
-/* Container da página - APENAS CENTRALIZAÇÃO */
+/* Container da página - CENTRALIZAÇÃO */
 .page-container {
   padding: 20px;
   box-sizing: border-box;
 }
 
-/* Container principal - APENAS O CONTEÚDO */
+/* Container principal - CONTEÚDO */
 .pets-card {
   width: 100%;
   border: 1px solid #e8e8e8;
@@ -303,7 +317,7 @@ onMounted(() => fetchPets());
 
 .action-btn-table {
   min-width: 75px; /* Largura mínima para consistência */
-  flex-shrink: 0; /* Evitar que os botões fiquem muito pequenos */
+  flex-shrink: 0; /* Evita que os botões fiquem muito pequenos */
 }
 
 /* Cards mobile */
@@ -349,7 +363,7 @@ onMounted(() => fetchPets());
 .mobile-actions {
   display: flex;
   flex-direction: column;
-  gap: 8px; /* Espaçamento consistente entre os botões */
+  gap: 8px; /* Espaçamento entre os botões */
 }
 
 .mobile-btn {
