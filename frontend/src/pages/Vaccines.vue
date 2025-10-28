@@ -93,6 +93,8 @@ interface Vaccine {
   nome: string;
   descricao: string;
   validade: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 const vaccines = ref<Vaccine[]>([]);
@@ -103,16 +105,22 @@ const loading = ref(true);
 
 const api = axios.create({
   baseURL: "http://localhost:8000/api",
-  headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  headers: { 
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  },
 });
 
+// CORREÇÃO: Estrutura da resposta da API com paginação Laravel
 function formatDateBR(dateString: string | null) {
   if (!dateString) return "Não informada";
-  const date = new Date(dateString + "T00:00:00");
+  const date = new Date(dateString);
   return date.toLocaleDateString("pt-BR");
 }
 
 function truncated(text: string, max = 30) {
+  if (!text) return "Sem descrição";
   return text.length > max ? text.slice(0, max) + "..." : text;
 }
 
@@ -120,33 +128,74 @@ async function fetchVaccines(page = 1) {
   loading.value = true;
   try {
     const response = await api.get("/vacinas", {
-      params: { limit: perPage.value, page },
+      params: { 
+        limit: perPage.value, 
+        page: page 
+      },
     });
 
-    let items: any[] = [];
-    if (Array.isArray(response.data.items)) {
-      items = response.data.items;
-      totalVaccines.value = response.data.count;
+    console.log("Resposta da API:", response.data); // Para debug
+
+    let items: Vaccine[] = [];
+    let total = 0;
+
+    if (response.data && response.data.data) {
+      // Estrutura padrão do Laravel Resource com paginação
+      items = response.data.data;
+      total = response.data.total || response.data.meta?.total || 0;
+    } else if (Array.isArray(response.data)) {
+      // Fallback: se retornar array direto (sem paginação)
+      items = response.data;
+      total = response.data.length;
     }
 
-    vaccines.value = items.sort((a, b) => a.id - b.id);
+    // Ordenar por ID crescente
+    items = items.sort((a, b) => a.id - b.id);
+
+    vaccines.value = items;
+    totalVaccines.value = total;
     currentPage.value = page;
-  } catch (error) {
+
+  } catch (error: any) {
     console.error("Erro ao buscar vacinas:", error);
-    message.error("Erro ao carregar vacinas.");
+    
+    if (error.response?.status === 401) {
+      message.error("Sessão expirada. Faça login novamente.");
+      router.push("/login");
+    } else if (error.response?.data?.message) {
+      message.error(error.response.data.message);
+    } else {
+      message.error("Erro ao carregar vacinas.");
+    }
   } finally {
     setTimeout(() => (loading.value = false), 300);
   }
 }
 
 async function goToDelete(id: number) {
-  if (confirm("Tem certeza que deseja excluir esta vacina?")) {
-    try {
-      const response = await api.delete(`/vacinas/${id}`);
-      vaccines.value = vaccines.value.filter((v) => v.id !== id);
-      message.success(response.data.message || "Vacina excluída com sucesso!");
-    } catch (error) {
-      console.error("Erro ao excluir vacina:", error);
+  if (!confirm("Tem certeza que deseja excluir esta vacina?")) {
+    return;
+  }
+
+  try {
+    await api.delete(`/vacinas/${id}`);
+    
+    // Remove da lista localmente
+    vaccines.value = vaccines.value.filter((v) => v.id !== id);
+    totalVaccines.value -= 1;
+    
+    message.success("Vacina excluída com sucesso!");
+    
+    // Se a página ficou vazia, volta uma página
+    if (vaccines.value.length === 0 && currentPage.value > 1) {
+      fetchVaccines(currentPage.value - 1);
+    }
+  } catch (error: any) {
+    console.error("Erro ao excluir vacina:", error);
+    
+    if (error.response?.data?.message) {
+      message.error(error.response.data.message);
+    } else {
       message.error("Erro ao excluir vacina.");
     }
   }
@@ -155,16 +204,28 @@ async function goToDelete(id: number) {
 function goToCreate() {
   router.push("/vaccines/create");
 }
+
 function goToView(id: number) {
   router.push(`/vaccines/view/${id}`);
 }
+
 function goToEdit(id: number) {
   router.push(`/vaccines/edit/${id}`);
 }
 
 const columns = [
-  { title: "ID", key: "id", width: 80 },
-  { title: "Nome", key: "nome", width: 150 },
+  { 
+    title: "ID", 
+    key: "id", 
+    width: 80,
+    sorter: (a: Vaccine, b: Vaccine) => a.id - b.id
+  },
+  { 
+    title: "Nome", 
+    key: "nome", 
+    width: 150,
+    sorter: (a: Vaccine, b: Vaccine) => a.nome.localeCompare(b.nome)
+  },
   {
     title: "Descrição",
     key: "descricao",
@@ -180,28 +241,34 @@ const columns = [
     render(row: Vaccine) {
       return formatDateBR(row.validade);
     },
+    sorter: (a: Vaccine, b: Vaccine) => {
+      const dateA = a.validade ? new Date(a.validade).getTime() : 0;
+      const dateB = b.validade ? new Date(b.validade).getTime() : 0;
+      return dateA - dateB;
+    }
   },
   {
     title: "Ações",
     key: "actions",
     width: 280,
+    fixed: 'right',
     render(row: Vaccine) {
       return h("div", { class: "table-actions" }, [
         h(NButton, { 
           size: "small", 
           onClick: () => goToView(row.id),
-          class: "action-btn-table"
+          class: "action-btn-table view-btn"
         }, { default: () => "Visualizar" }),
         h(NButton, { 
           size: "small", 
           onClick: () => goToEdit(row.id),
-          class: "action-btn-table"
+          class: "action-btn-table edit-btn"
         }, { default: () => "Editar" }),
         h(NButton, { 
           size: "small", 
           type: "error", 
           onClick: () => goToDelete(row.id),
-          class: "action-btn-table"
+          class: "action-btn-table delete-btn"
         }, { default: () => "Excluir" }),
       ]);
     },
@@ -211,23 +278,30 @@ const columns = [
 const totalPages = computed(() => Math.ceil(totalVaccines.value / perPage.value));
 
 function nextPage() {
-  if (currentPage.value < totalPages.value) fetchVaccines(currentPage.value + 1);
-}
-function prevPage() {
-  if (currentPage.value > 1) fetchVaccines(currentPage.value - 1);
+  if (currentPage.value < totalPages.value) {
+    fetchVaccines(currentPage.value + 1);
+  }
 }
 
-onMounted(() => fetchVaccines());
+function prevPage() {
+  if (currentPage.value > 1) {
+    fetchVaccines(currentPage.value - 1);
+  }
+}
+
+onMounted(() => {
+  fetchVaccines();
+});
 </script>
 
 <style scoped>
-/* Container da página - APENAS ESPAÇAMENTO */
+/* Container da página - ESPAÇAMENTO */
 .page-container {
   padding: 20px;
   box-sizing: border-box;
 }
 
-/* Container principal - APENAS O CONTEÚDO */
+/* Container principal - CONTEÚDO */
 .vaccines-card {
   width: 100%;
   border: 1px solid #e8e8e8;
