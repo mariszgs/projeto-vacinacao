@@ -4,7 +4,6 @@
       class="edit-vaccine-card"
       :bordered="true"
     >
-      <!-- Transição suave -->
       <transition name="fade" mode="out-in">
         <n-form ref="formRef" :model="form" :rules="rules" label-placement="top" size="large" class="vaccine-form">
           
@@ -46,7 +45,8 @@
                   type="date" 
                   placeholder="Selecione a data"
                   format="dd/MM/yyyy" 
-                  value-format="timestamp"
+                  value-format="timestamp" 
+                  :disabled-date="disablePastDates"
                   size="large"
                   style="width: 100%"
                 />
@@ -81,20 +81,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, reactive } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import axios from "axios";
 import { NForm, NFormItem, NInput, NButton, NDatePicker, useMessage } from "naive-ui";
-import type { FormRules } from "naive-ui";
+import type { FormRules, FormInst } from "naive-ui";
 
 const route = useRoute();
 const router = useRouter();
 const message = useMessage();
 const submitting = ref(false);
+const loading = ref(true);
 
-const formRef = ref<InstanceType<typeof NForm>>();
+const formRef = ref<FormInst | null>(null);
 
-const form = ref({
+const form = reactive({
   nome: "",
   descricao: "",
   validade: null as number | null
@@ -102,56 +103,143 @@ const form = ref({
 
 const rules: FormRules = {
   nome: [
-    { required: true, message: "Nome obrigatório", trigger: "blur" }, 
-    { max: 255, message: "Máximo 255 caracteres" }
+    { required: true, message: "Nome obrigatório", trigger: ["blur", "input"] }
   ],
-  descricao: [],
-  validade: []
+  validade: [
+    { 
+      required: true, 
+      message: "Data de validade obrigatória", 
+      trigger: ["blur", "change"],
+      validator: (rule: any, value: number | null) => {
+        return !!value
+      }
+    }
+  ]
 };
 
 const api = axios.create({
   baseURL: "http://localhost:8000/api",
-  headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  headers: { 
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  },
 });
+
+function disablePastDates(date: number) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date < today.getTime();
+}
+
+function stringToTimestamp(dateString: string | null): number | null {
+  if (!dateString) return null;
+  try {
+    const date = new Date(dateString + 'T12:00:00'); // Meio-dia para evitar problemas de timezone
+    return date.getTime();
+  } catch (error) {
+    console.error('Erro ao converter data:', error);
+    return null;
+  }
+}
+
+function timestampToString(timestamp: number | null): string | null {
+  if (!timestamp) return null;
+  try {
+    const date = new Date(timestamp);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  } catch (error) {
+    console.error('Erro ao converter timestamp:', error);
+    return null;
+  }
+}
 
 async function fetchVaccine() {
   try {
     const id = route.params.id;
-    const res = await api.get(`/vacinas/${id}`);
-    const data = res.data;
+    
+    const response = await api.get(`/vacinas/${id}`);
+    const data = response.data.data || response.data;
 
-    form.value.nome = data.nome;
-    form.value.descricao = data.descricao;
-    form.value.validade = data.validade ? new Date(data.validade + "T00:00:00").getTime() : null;
-  } catch (error) {
-    console.error(error);
-    message.error("Não foi possível carregar a vacina.");
+    form.nome = data.nome || "";
+    form.descricao = data.descricao || "";
+    form.validade = stringToTimestamp(data.validade);
+
+    console.log("✅ Formulário carregado:", {
+      nome: form.nome,
+      descricao: form.descricao,
+      validade: form.validade,
+      dataSelecionada: form.validade ? new Date(form.validade).toLocaleDateString('pt-BR') : 'nula'
+    });
+    
+  } catch (error: any) {
+    console.error("❌ Erro ao buscar vacina:", error);
+    
+    if (error.response?.status === 404) {
+      message.error("Vacina não encontrada.");
+      router.push("/vaccines");
+    } else if (error.response?.status === 401) {
+      message.error("Sessão expirada. Faça login novamente.");
+      router.push("/login");
+    } else {
+      message.error("Não foi possível carregar a vacina.");
+    }
+  } finally {
+    loading.value = false;
   }
 }
 
 async function submit() {
+  if (!formRef.value) return;
+
   submitting.value = true;
   try {
-    await formRef.value?.validate();
+    await formRef.value.validate();
+
     const id = route.params.id;
-
-    const validadeAjustada = form.value.validade
-      ? (() => { const d = new Date(form.value.validade); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })()
-      : null;
-
+    
     const payload = { 
-      nome: form.value.nome, 
-      descricao: form.value.descricao, 
-      validade: validadeAjustada 
+      nome: form.nome.trim(),
+      descricao: form.descricao.trim() || null, 
+      validade: timestampToString(form.validade)
     };
 
-    await api.put(`/vacinas/${id}`, payload);
+    console.log("📤 Enviando para API:", payload);
+
+    const response = await api.put(`/vacinas/${id}`, payload);
+
+    console.log("✅ Vacina atualizada:", response.data);
 
     message.success("Vacina atualizada com sucesso!");
+    
     router.push("/vaccines");
+    
   } catch (error: any) {
-    console.error(error);
-    message.error(error.response?.data?.message || "Erro ao atualizar vacina.");
+    console.error("❌ Erro:", error);
+    
+    if (error.response?.status === 422) {
+      const errors = error.response.data?.errors;
+      if (errors?.validade) {
+        message.error(errors.validade[0]);
+      } else if (errors?.nome) {
+        message.error(errors.nome[0]);
+      } else {
+        message.error("Erro de validação nos dados.");
+      }
+    } 
+    else if (error.response?.status === 404) {
+      message.error("Vacina não encontrada.");
+    }
+    else if (error.response?.status === 401) {
+      message.error("Sessão expirada. Faça login novamente.");
+      router.push("/login");
+    }
+    else {
+      message.error("Erro ao atualizar vacina.");
+    }
   } finally {
     submitting.value = false;
   }
@@ -161,11 +249,12 @@ function cancel() {
   router.push("/vaccines"); 
 }
 
-onMounted(fetchVaccine);
+onMounted(() => {
+  fetchVaccine();
+});
 </script>
 
 <style scoped>
-/* Container da página - APENAS ESPAÇAMENTO */
 .page-container {
   padding: 20px;
   box-sizing: border-box;
@@ -175,7 +264,6 @@ onMounted(fetchVaccine);
   min-height: 100vh;
 }
 
-/* Container principal */
 .edit-vaccine-card {
   width: 100%;
   max-width: 600px;
@@ -185,7 +273,6 @@ onMounted(fetchVaccine);
   background-color: #fff;
 }
 
-/* Cabeçalho do formulário */
 .form-header {
   margin-bottom: 20px;
   text-align: center;
@@ -208,7 +295,6 @@ onMounted(fetchVaccine);
   margin: 20px 0;
 }
 
-/* Formulário */
 .vaccine-form {
   width: 100%;
 }
@@ -231,7 +317,6 @@ onMounted(fetchVaccine);
   grid-column: 1 / -1;
 }
 
-/* Botões de ação */
 .action-buttons {
   display: flex;
   gap: 12px;
@@ -245,7 +330,6 @@ onMounted(fetchVaccine);
   min-width: 160px;
 }
 
-/* Transição de fade */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease, transform 0.3s ease;
@@ -259,7 +343,6 @@ onMounted(fetchVaccine);
   transform: translateY(-10px);
 }
 
-/* RESPONSIVIDADE MOBILE */
 @media (max-width: 768px) {
   .page-container {
     padding: 12px;
@@ -298,17 +381,6 @@ onMounted(fetchVaccine);
   
   .form-title {
     font-size: 20px;
-  }
-}
-
-/* Para telas muito pequenas */
-@media (max-width: 320px) {
-  .page-container {
-    padding: 4px;
-  }
-  
-  .form-title {
-    font-size: 18px;
   }
 }
 </style>
