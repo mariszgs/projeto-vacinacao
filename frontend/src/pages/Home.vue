@@ -44,7 +44,7 @@
             class="alert-section"
             title="Atenção: Vacinas Atrasadas"
           >
-            Existem {{ overdueVaccines }} vacina(s) atrasada(s) que precisam de atenção.
+            Existe(m) {{ overdueVaccines }} vacina(s) atrasada(s) que precisa(m) de atenção.
           </n-alert>
 
           <!-- Estatísticas -->
@@ -96,6 +96,7 @@
                   <strong class="pet-name">{{ pet.name }}</strong>
                   <span class="vaccine-info">{{ pet.vaccine }}</span>
                   <span class="vaccine-date">{{ formatDate(pet.date) }}</span>
+                  <span class="days-late">({{ pet.daysLate }} dias atrasada)</span>
                 </div>
                 <n-button 
                   size="small" 
@@ -124,7 +125,7 @@
             class="no-overdue-section"
             :bordered="true"
           >
-            <n-empty description="Nenhuma vacina atrasada" size="large">
+            <n-empty description="Nenhuma vacina atrasada encontrada" size="large">
               <template #extra>
                 <n-button type="primary" @click="goToPetsPage">
                   Ver Todos os Pets
@@ -142,17 +143,27 @@
 import { ref, onMounted } from "vue"
 import { useRouter } from "vue-router"
 import axios, { AxiosHeaders } from "axios"
+import { useMessage } from "naive-ui"
 
-interface Vacina {
+const message = useMessage()
+const router = useRouter()
+const totalPets = ref(0)
+const totalVaccines = ref(0)
+const overdueVaccines = ref(0)
+const overduePets = ref<OverduePet[]>([])
+const loading = ref(true)
+
+interface VacinaAplicada {
+  id: number
   data_aplicacao: string
-  data_agendada?: string
-  vacina: { nome: string }
+  vacina_nome: string
+  vacina?: { nome: string }
 }
 
 interface Pet {
   id: number
   name: string
-  vacinas_aplicadas?: Vacina[]
+  pet_vacinas?: VacinaAplicada[]
 }
 
 interface OverduePet {
@@ -160,14 +171,8 @@ interface OverduePet {
   name: string
   vaccine: string
   date: string
+  daysLate: number
 }
-
-const router = useRouter()
-const totalPets = ref(0)
-const totalVaccines = ref(0)
-const overdueVaccines = ref(0)
-const overduePets = ref<OverduePet[]>([])
-const loading = ref(true)
 
 const api = axios.create({ baseURL: "http://localhost:8000/api" })
 api.interceptors.request.use(config => {
@@ -184,15 +189,24 @@ function formatDate(dateString: string): string {
   return date.toLocaleDateString('pt-BR')
 }
 
+function calculateDaysLate(vaccineDate: Date): number {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const diffTime = today.getTime() - vaccineDate.getTime()
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  return diffDays - 365 // Dias além de 1 ano
+}
+
 async function fetchDashboardData() {
   loading.value = true
+  
   try {
     const petsRes = await api.get("/pets")
-    const pets: Pet[] = Array.isArray(petsRes.data.items) ? petsRes.data.items : []
+    const pets: Pet[] = petsRes.data.data || petsRes.data || []
     totalPets.value = pets.length
 
     const vaccinesRes = await api.get("/vacinas")
-    const vaccines = Array.isArray(vaccinesRes.data.items) ? vaccinesRes.data.items : []
+    const vaccines = vaccinesRes.data.data || vaccinesRes.data || []
     totalVaccines.value = vaccines.length
 
     const overdueList: OverduePet[] = []
@@ -200,29 +214,63 @@ async function fetchDashboardData() {
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
     oneYearAgo.setHours(0, 0, 0, 0)
 
-    for (const pet of pets) {
-      const detailRes = await api.get(`/pets/${pet.id}`)
-      const petData = detailRes.data
-      const vacinas = petData.vacinas_aplicadas || []
 
-      for (const vac of vacinas) {
-        const dataVacina = new Date(vac.data_agendada || vac.data_aplicacao)
-        dataVacina.setHours(0, 0, 0, 0)
-        if (dataVacina <= oneYearAgo) {
-          overdueList.push({
-            id: pet.id,
-            name: pet.name,
-            vaccine: vac.vacina?.nome || "Vacina desconhecida",
-            date: vac.data_agendada || vac.data_aplicacao
-          })
+    // Para cada pet, buscar vacinas aplicadas
+    for (const pet of pets) {
+      try {
+
+        const detailRes = await api.get(`/pets/${pet.id}`)
+        const petData = detailRes.data.data || detailRes.data
+        
+        let vacinasAplicadas: VacinaAplicada[] = []
+        
+        try {
+          const vacinasRes = await api.get(`/pets/${pet.id}/vacinas`)
+          vacinasAplicadas = vacinasRes.data.data || vacinasRes.data || []
+        } catch (err) {
+          vacinasAplicadas = petData.pet_vacinas || petData.petVacinas || []
         }
+
+        // Verificar vacinas atrasadas (aplicadas há mais de 1 ano)
+        for (const vac of vacinasAplicadas) {
+          if (vac.data_aplicacao) {
+            const dataVacina = new Date(vac.data_aplicacao)
+            dataVacina.setHours(0, 0, 0, 0)
+            
+            if (dataVacina <= oneYearAgo) {
+              const vaccineName = vac.vacina_nome || vac.vacina?.nome || "Vacina desconhecida"
+              const daysLate = calculateDaysLate(dataVacina)
+              
+              overdueList.push({
+                id: pet.id,
+                name: pet.name,
+                vaccine: vaccineName,
+                date: vac.data_aplicacao,
+                daysLate: daysLate
+              })
+              
+            }
+          } else {
+          
+          }
+        }
+      } catch (err) {
+        console.error(`Erro ao processar pet ${pet.id}:`, err)
       }
     }
 
     overdueVaccines.value = overdueList.length
     overduePets.value = overdueList
+
+    if (overduePets.value.length > 0) {
+      overduePets.value.forEach(pet => {
+      })
+    } else {
+
+    }
+
   } catch (err) {
-    console.error("Erro ao carregar dashboard:", err)
+    message.error("Erro ao carregar dados do dashboard")
   } finally {
     loading.value = false
   }
@@ -236,7 +284,9 @@ function goToPetDetails(petId: number) {
   router.push(`/pets/${petId}`)
 }
 
-onMounted(fetchDashboardData)
+onMounted(() => {
+  fetchDashboardData()
+})
 </script>
 
 <style scoped>
