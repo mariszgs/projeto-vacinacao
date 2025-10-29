@@ -93,8 +93,10 @@ const route = useRoute();
 interface Vaccine {
   id: number;
   nome: string;
-  descricao: string;
-  validade: string | null;
+  descricao: string | null;
+  validade: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 const vaccine = ref<Vaccine | null>(null);
@@ -108,8 +110,21 @@ const api = axios.create({
 
 function formatDateBR(dateString: string | null) {
   if (!dateString) return "Não informada";
-  const date = new Date(dateString + "T00:00:00");
-  return date.toLocaleDateString('pt-BR');
+  
+  try {
+    // Remove qualquer timezone e cria a data
+    const date = new Date(dateString.replace(' ', 'T'));
+    
+    // Verifica se a data é válida
+    if (isNaN(date.getTime())) {
+      return "Data inválida";
+    }
+    
+    return date.toLocaleDateString('pt-BR');
+  } catch (error) {
+    console.error("Erro ao formatar data:", error, "String original:", dateString);
+    return "Data inválida";
+  }
 }
 
 async function fetchVaccine() {
@@ -119,12 +134,37 @@ async function fetchVaccine() {
     message.error("ID da vacina não encontrado");
     return;
   }
+  
   try {
     const response = await api.get(`/vacinas/${id}`);
-    vaccine.value = response.data;
-  } catch (error) {
-    console.error("Erro ao buscar vacina:", error);
-    message.error("Erro ao carregar a vacina.");
+    
+    // Log para debug
+    console.log("Resposta completa da API:", response);
+    console.log("Dados da vacina:", response.data);
+    
+    // Verificar se a estrutura está correta
+    if (response.data && response.data.nome) {
+      vaccine.value = response.data;
+    } else {
+      // Tentar acessar data.data se estiver aninhado
+      vaccine.value = response.data.data || response.data;
+    }
+    
+  } catch (error: any) {
+    console.error("Erro detalhado:", error);
+    console.error("Resposta de erro:", error.response);
+    
+    if (error.response?.status === 401) {
+      message.error("Sessão expirada. Faça login novamente.");
+      router.push("/login");
+    } else if (error.response?.status === 404) {
+      message.error("Vacina não encontrada.");
+      router.back();
+    } else if (error.response?.status === 500) {
+      message.error("Erro interno do servidor.");
+    } else {
+      message.error("Erro ao carregar a vacina.");
+    }
   }
 }
 
@@ -140,7 +180,7 @@ onMounted(() => fetchVaccine());
 </script>
 
 <style scoped>
-/* Container da página - APENAS ESPAÇAMENTO */
+/* Container da página - ESPAÇAMENTO */
 .page-container {
   padding: 20px;
   box-sizing: border-box;
@@ -346,7 +386,7 @@ onMounted(() => fetchVaccine());
   .vaccine-detail-card {
     border-radius: 6px;
   }
-  
+    
   .vaccine-name {
     font-size: 20px;
   }
