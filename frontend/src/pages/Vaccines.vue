@@ -112,7 +112,6 @@ const api = axios.create({
   },
 });
 
-// CORREÇÃO: Estrutura da resposta da API com paginação Laravel
 function formatDateBR(dateString: string | null) {
   if (!dateString) return "Não informada";
   const date = new Date(dateString);
@@ -134,13 +133,11 @@ async function fetchVaccines(page = 1) {
       },
     });
 
-    console.log("Resposta da API:", response.data); // Para debug
-
     let items: Vaccine[] = [];
     let total = 0;
 
     if (response.data && response.data.data) {
-      // Estrutura padrão do Laravel Resource com paginação
+      // Estrutura padrão Resource com paginação
       items = response.data.data;
       total = response.data.total || response.data.meta?.total || 0;
     } else if (Array.isArray(response.data)) {
