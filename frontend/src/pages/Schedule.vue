@@ -5,10 +5,8 @@
       class="schedule-card"
       :bordered="true"
     >
-      <!-- Transição suave -->
       <transition name="fade" mode="out-in">
         <div v-if="selectedPet" key="content">
-          <!-- Cabeçalho do Pet -->
           <div class="pet-header">
             <div class="pet-info">
               <h2 class="pet-name">{{ selectedPet.name }}</h2>
@@ -19,10 +17,9 @@
           <n-divider class="custom-divider" />
 
           <n-form ref="formRef" :model="form" :rules="rules" label-placement="top" size="large" class="schedule-form">
-            <!-- Data do agendamento -->
-            <n-form-item label="Data do Agendamento" path="scheduleDate" class="form-item">
+            <n-form-item label="Data do Agendamento" path="data_agendada" class="form-item">
               <n-date-picker
-                v-model:value="form.scheduleDate"
+                v-model:value="form.data_agendada"
                 type="date"
                 placeholder="Escolha a data"
                 :disabled-date="disablePastDates"
@@ -32,18 +29,17 @@
               />
             </n-form-item>
 
-            <!-- Seletor de vacina -->
-            <n-form-item label="Vacina" path="selectedVaccine" class="form-item">
+            <n-form-item label="Vacina" path="vacina_id" class="form-item">
               <n-select
-                v-model:value="form.selectedVaccine"
+                v-model:value="form.vacina_id"
                 :options="allVaccinesOptions"
                 placeholder="Selecione a vacina"
                 style="width: 100%"
                 size="large"
+                :loading="loadingVaccines"
               />
             </n-form-item>
 
-            <!-- Vacinas Atrasadas -->
             <div v-if="overdueVaccines.length" class="overdue-section">
               <h3 class="section-title">Vacinas Atrasadas</h3>
               <div class="vaccines-list">
@@ -65,7 +61,16 @@
               </div>
             </div>
 
-            <!-- Botões de Ação -->
+            <n-form-item label="Observações (Opcional)" path="observacoes" class="form-item">
+              <n-input
+                v-model:value="form.observacoes"
+                type="textarea"
+                placeholder="Adicione observações sobre o agendamento"
+                :rows="3"
+                size="large"
+              />
+            </n-form-item>
+
             <div class="action-buttons">
               <n-button 
                 type="primary" 
@@ -88,7 +93,6 @@
           </n-form>
         </div>
 
-        <!-- Loading state -->
         <div v-else key="loading" class="loading-container">
           <n-skeleton height="32px" width="200px" style="margin-bottom: 20px;" />
           <n-skeleton height="20px" :repeat="3" style="margin-bottom: 8px;" />
@@ -103,7 +107,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FormInst } from 'naive-ui'
 import axios from 'axios'
-import { useMessage, NTag } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 
 const message = useMessage()
 const route = useRoute()
@@ -112,17 +116,18 @@ const petIdFromRoute = Number(route.params.id) || null
 const selectedPetId = ref<number | null>(petIdFromRoute)
 const formRef = ref<FormInst | null>(null)
 const scheduling = ref(false)
+const loadingVaccines = ref(false)
 
 // Formulário
 const form = ref({
-  selectedVaccine: null as number | null,
-  scheduleDate: null as number | null
+  vacina_id: null as number | null,
+  data_agendada: null as number | null,
+  observacoes: null as string | null
 })
 
-// Regras
-//  Regras atualizadas para aceitar timestamp e ID numérico
+// Regras de validação
 const rules = {
-  selectedVaccine: [
+  vacina_id: [
     {
       required: true,
       validator: (_rule: any, value: number | null) => {
@@ -132,11 +137,20 @@ const rules = {
       trigger: ['change', 'blur']
     }
   ],
-  scheduleDate: [
+  data_agendada: [
     {
       required: true,
       validator: (_rule: any, value: number | null) => {
         if (!value) return new Error('Escolha a data do agendamento')
+        
+        const selectedDate = new Date(value)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        
+        if (selectedDate <= today) {
+          return new Error('A data do agendamento deve ser futura')
+        }
+        
         return true
       },
       trigger: ['change', 'blur']
@@ -144,20 +158,10 @@ const rules = {
   ]
 }
 
-
 // Pet e vacinas
 const selectedPet = ref<any>(null)
 const overdueVaccines = ref<any[]>([])
 const allVaccinesOptions = ref<{label: string, value: number}[]>([])
-
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map(part => part.charAt(0))
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
-}
 
 // Formatar data para exibir
 function formatDateBR(dateStr: string): string {
@@ -183,7 +187,7 @@ function disablePastDates(date: number) {
   return date < today.getTime()
 }
 
-// Buscar dados do backend
+// Buscar dados do back
 onMounted(async () => {
   const token = localStorage.getItem('token')
   if (!token || !selectedPetId.value) {
@@ -193,48 +197,80 @@ onMounted(async () => {
   }
 
   try {
-    // Pet
+    // Buscar dados do pet
     const resPet = await axios.get(`http://127.0.0.1:8000/api/pets/${selectedPetId.value}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     selectedPet.value = resPet.data
 
-    // Vacinas atrasadas
+    // Buscar vacinas atrasadas do pet
     if (selectedPet.value.vacinas_aplicadas && Array.isArray(selectedPet.value.vacinas_aplicadas)) {
       overdueVaccines.value = selectedPet.value.vacinas_aplicadas
-        .filter((v: any) => isVaccineLate(v.data_aplicacao))
+        .filter((v: any) => v.data_aplicacao && isVaccineLate(v.data_aplicacao))
         .map((v: any) => ({
           id: v.id,
-          name: v.vacina.nome,
+          name: v.vacina?.nome || 'Vacina não encontrada',
           date: v.data_aplicacao
         }))
     }
 
-    // Todas vacinas
+    // Buscar todas as vacinas disponíveis
+    await loadAllVaccines(token)
+
+  } catch (err: any) {
+    console.error('Erro ao carregar dados do pet ou vacinas:', err)
+    
+    if (err.response?.status === 401) {
+      message.error('Sessão expirada. Faça login novamente.')
+      router.push('/login')
+    } else {
+      message.error('Erro ao carregar dados do pet')
+      router.push('/pets')
+    }
+  }
+})
+
+// Carregar todas as vacinas
+async function loadAllVaccines(token: string) {
+  loadingVaccines.value = true
+  try {
     const resVacinas = await axios.get('http://127.0.0.1:8000/api/vacinas', {
       headers: { Authorization: `Bearer ${token}` }
     })
 
-    allVaccinesOptions.value = resVacinas.data.items.map((v: any) => ({
+    let vaccinesData = resVacinas.data
+    
+    if (resVacinas.data.data) {
+      vaccinesData = resVacinas.data.data
+    }
+    else if (resVacinas.data.items) {
+      vaccinesData = resVacinas.data.items
+    }
+    else if (Array.isArray(resVacinas.data)) {
+      vaccinesData = resVacinas.data
+    }
+
+    allVaccinesOptions.value = vaccinesData.map((v: any) => ({
       label: v.nome,
       value: v.id
     }))
 
-  } catch (err) {
-    console.error('Erro ao carregar dados do pet ou vacinas:', err)
-    message.error('Erro ao carregar dados do pet')
-    router.push('/pets')
-  }
-})
+    console.log('Vacinas carregadas:', allVaccinesOptions.value)
 
-// Agendar vacina
+  } catch (err) {
+    console.error('Erro ao carregar vacinas:', err)
+    message.error('Erro ao carregar lista de vacinas')
+  } finally {
+    loadingVaccines.value = false
+  }
+}
+
 // Agendar vacina
 async function scheduleVaccination() {
   if (!selectedPetId.value || !formRef.value) return
 
   scheduling.value = true
   try {
-    // Força a validação e captura erros de forma mais clara
     await formRef.value.validate()
 
     const token = localStorage.getItem('token')
@@ -243,42 +279,46 @@ async function scheduleVaccination() {
       return
     }
 
-    // Formatar a data corretamente (YYYY-MM-DD)
-    const dataAgendadaFormatted = form.value.scheduleDate
-      ? new Date(form.value.scheduleDate).toISOString().split('T')[0]
+    // Formatar a data (YYYY-MM-DD)
+    const dataAgendadaFormatted = form.value.data_agendada
+      ? new Date(form.value.data_agendada).toISOString().split('T')[0]
       : null
 
     const payload = {
       pet_id: selectedPetId.value,
-      vacina_id: form.value.selectedVaccine,
+      vacina_id: form.value.vacina_id,
       data_agendada: dataAgendadaFormatted,
-      observacoes: null
+      observacoes: form.value.observacoes || null
     }
 
+    console.log('Enviando payload:', payload)
 
-    // Requisição ao backend
     const res = await axios.post(
       'http://127.0.0.1:8000/api/agendamento-de-vacinas',
       payload,
-      { headers: { Authorization: `Bearer ${token}` } }
+      { 
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        } 
+      }
     )
 
     message.success('Vacinação agendada com sucesso!')
-
-    // Limpar formulário
-    form.value.selectedVaccine = null
-    form.value.scheduleDate = null
-
     router.push('/pets')
 
   } catch (err: any) {
-
+    console.error('Erro ao agendar vacina:', err)
+    
     if (Array.isArray(err)) {
-      // Se for erro de validação do Naive UI
       message.error('Preencha todos os campos obrigatórios corretamente.')
     } else if (err.response) {
-      // Erro vindo do backend
-      message.error(err.response.data.message || 'Erro no servidor.')
+      const errorMessage = err.response.data.message || 
+                          err.response.data.error || 
+                          'Erro no servidor ao agendar vacina.'
+      message.error(errorMessage)
+    } else if (err.request) {
+      message.error('Erro de conexão. Verifique sua internet.')
     } else {
       message.error('Erro inesperado ao agendar vacina.')
     }
@@ -287,12 +327,11 @@ async function scheduleVaccination() {
   }
 }
 
-
 function goBack() {
   router.push('/pets')
 }
-
 </script>
+
 
 <style scoped>
 /* Container da página para centralização */
