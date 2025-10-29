@@ -64,8 +64,8 @@
                 class="vaccine-card"
               >
                 <div class="vaccine-content">
-                  <span class="vaccine-name">{{ vac.name }}</span>
-                  <span class="vaccine-date">{{ formatarData(new Date(vac.date || 0).toISOString()) }}</span>
+                  <span class="vaccine-name">{{ vac.vacina_nome }}</span>
+                  <span class="vaccine-date">{{ formatarData(vac.data_aplicacao) }}</span>
                 </div>
               </n-card>
             </div>
@@ -78,60 +78,75 @@
             </n-empty>
           </div>
 
-          <!-- Vacinas Agendadas -->
-          <div class="form-section">
-            <h3 class="section-title">Vacinas Agendadas</h3>
-            <div class="vaccines-list" v-if="paginatedVacinasAgendadas.length">
-              <n-card
-                v-for="vac in paginatedVacinasAgendadas"
-                :key="vac.id"
-                class="vaccine-card scheduled"
-              >
-                <div class="vaccine-content">
-                  <div class="vaccine-info">
-                    <span class="vaccine-name">{{ vac.vacina.nome }}</span>
-                    <span class="vaccine-date">{{ formatarData(vac.data_agendada || vac.data_aplicacao) }}</span>
-                  </div>
-                  <n-button 
-                    type="error" 
-                    size="small" 
-                    @click="cancelVaccine(vac.id)"
-                    class="cancel-btn"
-                  >
-                    Cancelar
-                  </n-button>
-                </div>
-              </n-card>
-            </div>
-            <n-empty v-else description="Nenhuma vacina agendada" class="empty-state">
-              <template #extra>
-                <n-button size="small" @click="goToSchedule(pet.id)">
-                  Agendar Vacinação
-                </n-button>
-              </template>
-            </n-empty>
-
-            <!-- Paginação -->
-            <div v-if="totalPages > 1" class="pagination">
-              <n-button 
-                size="small" 
-                :disabled="currentPage === 1" 
-                @click="currentPage--"
-                class="page-btn"
-              >
-                Anterior
-              </n-button>
-              <span class="page-info">Página {{ currentPage }} de {{ totalPages }}</span>
-              <n-button 
-                size="small" 
-                :disabled="currentPage === totalPages" 
-                @click="currentPage++"
-                class="page-btn"
-              >
-                Próxima
-              </n-button>
-            </div>
+        <!-- Vacinas Agendadas -->
+         <div class="form-section">
+          <h3 class="section-title">Vacinas Agendadas</h3>
+        <div class="vaccines-list" v-if="paginatedVacinasAgendadas.length">
+          <n-card
+          v-for="vac in paginatedVacinasAgendadas"
+          :key="vac.id"
+          class="vaccine-card scheduled"
+          >
+      <div class="vaccine-content">
+        <div class="vaccine-info">
+          <span class="vaccine-name">{{ vac.vacina?.nome || 'Vacina' }}</span>
+          <span class="vaccine-date">{{ formatarData(vac.data_agendada) }}</span>
+          <div v-if="vac.observacoes" class="vaccine-observations">
+            <n-text depth="3" class="observations-text">
+              {{ vac.observacoes }}
+            </n-text>
           </div>
+        </div>
+        <div class="vaccine-actions">
+          <n-button 
+            type="primary" 
+            size="small" 
+            @click="editVaccine(vac.id)"
+            class="edit-btn"
+          >
+            Editar
+          </n-button>
+          <n-button 
+            type="error" 
+            size="small" 
+            @click="cancelVaccine(vac.id)"
+            class="cancel-btn"
+          >
+            Cancelar
+          </n-button>
+        </div>
+      </div>
+    </n-card>
+  </div>
+  <n-empty v-else description="Nenhuma vacina agendada" class="empty-state">
+    <template #extra>
+      <n-button size="small" @click="goToSchedule(pet.id)">
+        Agendar Vacinação
+      </n-button>
+    </template>
+  </n-empty>
+
+  <!-- Paginação -->
+  <div v-if="totalPages > 1" class="pagination">
+    <n-button 
+      size="small" 
+      :disabled="currentPage === 1" 
+      @click="currentPage--"
+      class="page-btn"
+    >
+      Anterior
+    </n-button>
+    <span class="page-info">Página {{ currentPage }} de {{ totalPages }}</span>
+    <n-button 
+      size="small" 
+      :disabled="currentPage === totalPages" 
+      @click="currentPage++"
+      class="page-btn"
+    >
+      Próxima
+    </n-button>
+  </div>
+</div>
 
           <!-- Vacinas Atrasadas -->
           <div class="form-section">
@@ -144,7 +159,7 @@
               >
                 <div class="vaccine-content">
                   <div class="vaccine-info">
-                    <span class="vaccine-name">{{ vac.vacina.nome }}</span>
+                    <span class="vaccine-name">{{ vac.vacina_nome }}</span>
                     <span class="vaccine-date">{{ formatarData(vac.data_aplicacao) }}</span>
                   </div>
                   <n-tag type="error" size="small" class="status-tag">
@@ -175,7 +190,6 @@
             >
               Cancelar
             </n-button>
-              
           </div>
         </n-form>
       </div>
@@ -194,23 +208,27 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FormInst, FormRules } from 'naive-ui'
 import axios, { AxiosHeaders } from 'axios'
-import { useMessage, NTag, NEmpty } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 
 const message = useMessage()
 const formRef = ref<FormInst | null>(null)
 const saving = ref(false)
 
-interface Vaccine {
+interface VacinaAplicada {
   id: number
-  name: string
-  date: number | null
+  vacina_id: number
+  vacina_nome: string
+  data_aplicacao: string
+  data_proxima_dose: string | null
 }
 
 interface VacinaAgendada {
   id: number
-  vacina: { nome: string }
-  data_aplicacao: string
-  data_agendada?: string
+  pet: { id: number }
+  vacina: { id: number; nome: string }
+  data_agendada: string
+  status: string
+  observacoes?: string
 }
 
 interface Pet {
@@ -218,33 +236,25 @@ interface Pet {
   name: string
   species: string
   birthdate: number | null
-  vaccines: Vaccine[]
-}
-
-interface VacinaDisponivel {
-  id: number
-  nome: string
 }
 
 const pet = ref<Pet>({
   id: 0,
   name: '',
   species: '',
-  birthdate: null,
-  vaccines: []
+  birthdate: null
 })
 
+const vacinasAplicadas = ref<VacinaAplicada[]>([])
 const vacinasAgendadas = ref<VacinaAgendada[]>([])
-const vacinasAtrasadas = ref<VacinaAgendada[]>([])
-const vacinasRecentes = ref<Vaccine[]>([])
+const vacinasAtrasadas = ref<VacinaAplicada[]>([])
+const vacinasRecentes = ref<VacinaAplicada[]>([])
 
 const speciesOptions = [
   { label: 'Cachorro', value: 'Cachorro' },
   { label: 'Gato', value: 'Gato' },
   { label: 'Outro', value: 'Outro' }
 ]
-
-const vacinasDisponiveis = ref<{ label: string; value: number }[]>([])
 
 const api = axios.create({ baseURL: 'http://localhost:8000/api' })
 api.interceptors.request.use(config => {
@@ -259,21 +269,15 @@ api.interceptors.request.use(config => {
 const route = useRoute()
 const router = useRouter()
 
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map(part => part.charAt(0))
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
+function formatarData(date: string): string {
+  if (!date) return '—'
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('pt-BR')
 }
 
-function parseVaccines(data: any[]): Vaccine[] {
-  return data.map(v => ({
-    id: v.id,
-    name: v.name,
-    date: v.date ? new Date(v.date).getTime() : null
-  }))
+function disabledDate(current: Date): boolean {
+  return current && current > new Date()
 }
 
 const rules: FormRules = {
@@ -291,22 +295,32 @@ const rules: FormRules = {
   ]
 }
 
-function disabledDate(current: Date): boolean { return current && current > new Date() }
-
+// Pet
 async function fetchPet() {
   const petId = Number(route.params.id)
-  if (!petId) { message.error('ID do pet inválido.'); router.push('/pets'); return }
+  if (!petId) {
+    message.error('ID do pet inválido.')
+    router.push('/pets')
+    return
+  }
 
   try {
-    const { data } = await api.get(`http://localhost:8000/api/pets/${petId}`)
+    const { data } = await api.get(`/pets/${petId}`)
+    const petData = data.data || data
+
     pet.value = {
-      id: data.id,
-      name: data.name,
-      species: data.species,
-      birthdate: data.birthdate || null,
-      vaccines: parseVaccines(data.vaccines || [])
+      id: petData.id,
+      name: petData.name,
+      species: petData.species,
+      birthdate: petData.birthdate ? new Date(petData.birthdate).getTime() : null
     }
-    separarVacinas(data.vacinas_aplicadas || [], data.vacinas_agendadas || [])
+
+    // Carrega as vacinas aplicadas e agendadas
+    await Promise.all([
+      fetchVacinasAplicadas(petId),
+      fetchVacinasAgendadas(petId)
+    ])
+
   } catch (err) {
     console.error(err)
     message.error('Erro ao carregar dados do pet.')
@@ -314,49 +328,65 @@ async function fetchPet() {
   }
 }
 
-async function fetchVacinas() {
+async function fetchVacinasAplicadas(petId: number) {
   try {
-    const { data } = await api.get('http://localhost:8000/api/vacinas')
-    const items = Array.isArray(data.items) ? data.items : []
-    vacinasDisponiveis.value = items.map((v: VacinaDisponivel) => ({ label: v.nome, value: v.id }))
+    const { data } = await api.get(`/pets/${petId}/vacinas`)
+    console.log('Vacinas aplicadas:', data)
+    vacinasAplicadas.value = data.data || data
+    
+    separarVacinasAplicadas()
   } catch (err) {
-    console.error('Erro ao carregar vacinas:', err)
-    message.error('Erro ao carregar vacinas disponíveis.')
+    console.error('Erro ao carregar vacinas aplicadas:', err)
   }
 }
 
-function separarVacinas(vacinasAplicadas: any[], vacinasAgendar: any[]) {
-  const hoje = new Date().setHours(0, 0, 0, 0)
+async function fetchVacinasAgendadas(petId: number) {
+  try {
+    const { data } = await api.get('/agendamento-de-vacinas')
+    console.log('Todos os agendamentos:', data)
+    
+    // Filtrar os agendamentos pelo pet_id
+    const todosAgendamentos = data.data || data
+    const agendamentosDoPet = todosAgendamentos.filter((ag: VacinaAgendada) => 
+      ag.pet?.id === petId
+    )
+    
+    console.log('Agendamentos do pet:', agendamentosDoPet)
+    
+    // Agendamentos pendentes (não cancelados e não realizados)
+    vacinasAgendadas.value = agendamentosDoPet.filter((ag: VacinaAgendada) => 
+      ag.status !== 'cancelado' && ag.status !== 'realizado'
+    )
+    
+    console.log('Vacinas agendadas filtradas:', vacinasAgendadas.value)
+    
+  } catch (err) {
+    console.error('Erro ao carregar vacinas agendadas:', err)
+  }
+}
+
+function separarVacinasAplicadas() {
+  const hoje = new Date()
   const umAnoAtras = new Date()
   umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1)
-  umAnoAtras.setHours(0, 0, 0, 0)
 
   vacinasRecentes.value = []
   vacinasAtrasadas.value = []
-  vacinasAgendadas.value = []
-
-  vacinasAplicadas.forEach(v => {
-    const dataAplicacao = new Date(v.data_aplicacao).setHours(0, 0, 0, 0)
-    if (dataAplicacao >= hoje) {
-      vacinasAgendadas.value.push({ id: v.id, vacina: v.vacina, data_aplicacao: v.data_aplicacao, data_agendada: v.data_aplicacao })
-    } else if (dataAplicacao < hoje && dataAplicacao >= umAnoAtras.getTime()) {
-      vacinasRecentes.value.push({ id: v.id, name: v.vacina.nome, date: dataAplicacao })
+  
+  vacinasAplicadas.value.forEach(vacina => {
+    const dataAplicacao = new Date(vacina.data_aplicacao)
+    
+    if (dataAplicacao >= umAnoAtras) {
+      // Vacina aplicada nos últimos 12 meses = RECENTE
+      vacinasRecentes.value.push(vacina)
     } else {
-      vacinasAtrasadas.value.push({ id: v.id, vacina: v.vacina, data_aplicacao: v.data_aplicacao })
+      // Vacina aplicada há mais de 1 ano = ATRASADA
+      vacinasAtrasadas.value.push(vacina)
     }
-  })
-
-  vacinasAgendar.forEach(v => {
-    vacinasAgendadas.value.push({
-      id: v.id,
-      vacina: v.vacina,
-      data_aplicacao: v.data_aplicacao || v.data_agendada,
-      data_agendada: v.data_agendada || v.data_aplicacao
-    })
   })
 }
 
-// PAGINAÇÃO DE VACINAS AGENDADAS
+// Paginação
 const currentPage = ref(1)
 const perPage = ref(5)
 const totalPages = computed(() => Math.ceil(vacinasAgendadas.value.length / perPage.value))
@@ -366,24 +396,19 @@ const paginatedVacinasAgendadas = computed(() => {
 })
 watch(vacinasAgendadas, () => { currentPage.value = 1 })
 
+// Atualizar pet
 async function savePet() {
   if (!formRef.value) return
   saving.value = true
-  
+
   try {
     await formRef.value.validate()
-
-    const token = localStorage.getItem('token')
-    if (!token) {
-      message.error('Você precisa estar logado!')
-      return
-    }
 
     const birthdate = pet.value.birthdate
       ? new Date(pet.value.birthdate).toISOString().split('T')[0]
       : null
 
-    await api.put(`http://localhost:8000/api/pets/${pet.value.id}`, {
+    await api.put(`/pets/${pet.value.id}`, {
       name: pet.value.name,
       species: pet.value.species,
       birthdate
@@ -399,37 +424,44 @@ async function savePet() {
   }
 }
 
-async function cancelVaccine(vacId: number) {
+// Editar agendamento
+function editVaccine(agendamentoId: number) {
+  router.push(`/schedule/edit/${agendamentoId}`)
+}
+
+// Cancelar agendamento
+async function cancelVaccine(agendamentoId: number) {
   try {
-    await api.delete(`http://localhost:8000/api/agendamento-de-vacinas/${vacId}`)
-    vacinasAgendadas.value = vacinasAgendadas.value.filter(v => v.id !== vacId)
-    message.success('Vacina cancelada com sucesso!')
+    await api.delete(`/agendamento-de-vacinas/${agendamentoId}`)
+    vacinasAgendadas.value = vacinasAgendadas.value.filter(v => v.id !== agendamentoId)
+    message.success('Agendamento cancelado com sucesso!')
   } catch (err) {
-    console.error('Erro ao cancelar vacina:', err)
-    message.error('Não foi possível cancelar a vacina.')
+    console.error('Erro ao cancelar agendamento:', err)
+    message.error('Não foi possível cancelar o agendamento.')
   }
 }
 
-function goBack() { router.push('/pets') }
+function goBack() {
+  router.push('/pets')
+}
+
 function goToSchedule(petId: number) {
   router.push(`/schedule/${petId}`)
 }
-function formatarData(date: string): string { return new Date(date).toLocaleDateString('pt-BR') }
 
 onMounted(() => {
   fetchPet()
-  fetchVacinas()
 })
 </script>
 
 <style scoped>
-/* Container da página - APENAS ESPAÇAMENTO */
+/* Container da página - ESPAÇAMENTO */
 .page-container {
   padding: 20px;
   box-sizing: border-box;
 }
 
-/* Container principal - APENAS O CONTEÚDO */
+/* Container principal - CONTEÚDO */
 .edit-pet-card {
   width: 100%;
   border: 1px solid #e8e8e8;
@@ -516,6 +548,12 @@ onMounted(() => {
   border: 1px solid #e8e8e8;
   border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.vaccine-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
 }
 
 .vaccine-card.scheduled {
@@ -531,6 +569,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  padding: 12px;
 }
 
 .vaccine-info {
@@ -551,8 +590,31 @@ onMounted(() => {
   font-size: 12px;
 }
 
-.cancel-btn {
+/* Ações das vacinas agendadas */
+.vaccine-actions {
+  display: flex;
+  gap: 8px;
   flex-shrink: 0;
+}
+
+.edit-btn {
+  background-color: #28a745;
+  border-color: #28a745;
+}
+
+.edit-btn:hover {
+  background-color: #218838;
+  border-color: #1e7e34;
+}
+
+.cancel-btn {
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+.cancel-btn:hover {
+  background-color: #c82333;
+  border-color: #bd2130;
 }
 
 .status-tag {
@@ -639,11 +701,17 @@ onMounted(() => {
   .vaccine-content {
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 12px;
   }
   
-  .cancel-btn, .status-tag {
-    align-self: flex-start;
+  .vaccine-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .vaccine-actions .n-button {
+    flex: 1;
+    min-width: 0;
   }
   
   .action-buttons {
@@ -682,6 +750,20 @@ onMounted(() => {
   .section-title {
     font-size: 16px;
   }
+  
+  .vaccine-content {
+    padding: 10px;
+  }
+  
+  .vaccine-actions {
+    flex-direction: column;
+    width: 100%;
+    gap: 6px;
+  }
+  
+  .vaccine-actions .n-button {
+    width: 100%;
+  }
 }
 
 /* Para telas muito pequenas */
@@ -693,5 +775,89 @@ onMounted(() => {
   .pet-title h2 {
     font-size: 18px;
   }
+  
+  .vaccine-content {
+    padding: 8px;
+  }
+  
+  .vaccine-name {
+    font-size: 13px;
+  }
+  
+  .vaccine-date {
+    font-size: 11px;
+  }
 }
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.empty-state .n-empty__description {
+  color: #6b7280;
+  margin-bottom: 16px;
+}
+
+.vaccine-card.scheduled .vaccine-name {
+  color: #007bff;
+}
+
+.vaccine-card.overdue .vaccine-name {
+  color: #dc3545;
+}
+
+/* Efeitos de hover suaves */
+.vaccine-card {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.vaccine-card:hover {
+  border-color: #d1d5db;
+}
+
+.vaccine-observations {
+  margin-top: 8px;
+  padding: 8px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border-left: 3px solid #007bff;
+}
+
+.observations-text {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #6b7280;
+  word-break: break-word;
+}
+
+/* Ajuste no vaccine-info para acomodar as observações */
+.vaccine-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0; /* texto quebra corretamente */
+}
+
+/* Ajustes responsivos para observações */
+@media (max-width: 768px) {
+  .vaccine-observations {
+    margin-top: 6px;
+    padding: 6px;
+  }
+  
+  .observations-text {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .vaccine-observations {
+    margin-top: 4px;
+    padding: 4px;
+  }
+}
+
 </style>
