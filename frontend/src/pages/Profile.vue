@@ -4,17 +4,13 @@
     class="profile-card"
     :bordered="true"
   >
-    
-    <!-- Transição suave -->
     <transition name="fade" mode="out-in">
-      <!-- Esqueleto de carregamento -->
       <div v-if="loading" key="loading" class="loading-container">
         <n-skeleton height="24px" width="60%" style="margin-bottom: 16px;" />
         <n-skeleton text :repeat="4" />
       </div>
 
-      <!-- Conteúdo do perfil -->
-      <div v-else key="content">
+      <div v-else-if="user.name" key="content">
         <!-- Modo visualização -->
         <div v-if="!isEditing" class="profile-view">
           <div class="avatar-section">
@@ -49,7 +45,6 @@
             </div>
           </div>
 
-          <!-- Desktop: mantém o n-descriptions -->
           <n-descriptions 
             bordered 
             label-placement="left" 
@@ -152,6 +147,24 @@
           </n-form>
         </div>
       </div>
+
+      <!-- Quando não há usuário -->
+      <div v-else key="no-user" class="no-user-container">
+        <n-result
+          status="404"
+          title="Usuário não encontrado"
+          :description="errorMessage || 'Não foi possível carregar os dados do usuário.'"
+        >
+          <template #footer>
+            <n-button @click="loadUser" type="primary">
+              Tentar Novamente
+            </n-button>
+            <n-button @click="debugResponse" type="default" style="margin-left: 10px;">
+              Debug Resposta
+            </n-button>
+          </template>
+        </n-result>
+      </div>
     </transition>
   </n-card>
 </template>
@@ -163,9 +176,11 @@ import { useMessage } from 'naive-ui'
 import type { FormInst, FormRules } from 'naive-ui'
 
 interface User {
+  id: number
   name: string
   email: string
   created_at: string
+  updated_at: string
 }
 
 interface UserForm {
@@ -175,16 +190,44 @@ interface UserForm {
   password_confirmation?: string
 }
 
-const user = ref<User>({ name: '', email: '', created_at: '' })
-const userForm = ref<UserForm>({ name: '', email: '', password: '', password_confirmation: '' })
+const user = ref<User>({ 
+  id: 0, 
+  name: '', 
+  email: '', 
+  created_at: '', 
+  updated_at: '' 
+})
+const userForm = ref<UserForm>({ 
+  name: '', 
+  email: '', 
+  password: '', 
+  password_confirmation: '' 
+})
 const loading = ref(true)
 const isEditing = ref(false)
 const saving = ref(false)
 const formRef = ref<FormInst | null>(null)
 const message = useMessage()
+const errorMessage = ref<string>('')
+const lastResponse = ref<any>(null)
 
-const token = localStorage.getItem('token')
-if (token) axios.defaults.headers.common['Authorization'] = 'Bearer ' + token
+// Função para debug da resposta
+function debugResponse() {
+  console.log('Última resposta da API:', lastResponse.value)
+  if (lastResponse.value) {
+    console.log('- response.data:', lastResponse.value.data)
+    console.log('- response.data.data:', lastResponse.value.data?.data)
+    console.log('- response.data.user:', lastResponse.value.data?.user)
+  }
+}
+
+// Configurar axios com token
+function setupAxiosHeaders() {
+  const token = localStorage.getItem('token')
+  if (token) {
+    axios.defaults.headers.common['Authorization'] = 'Bearer ' + token
+  }
+}
 
 // Regras de validação
 const rules: FormRules = {
@@ -197,7 +240,11 @@ const rules: FormRules = {
     { type: 'email', message: 'Email inválido', trigger: 'blur' }
   ],
   password: [
-    { min: 6, message: 'Senha deve ter pelo menos 6 caracteres', trigger: 'blur' }
+    { 
+      min: 6, 
+      message: 'Senha deve ter pelo menos 6 caracteres', 
+      trigger: 'blur' 
+    }
   ],
   password_confirmation: [
     { 
@@ -206,12 +253,13 @@ const rules: FormRules = {
         return value === userForm.value.password
       },
       message: 'As senhas não coincidem',
-      trigger: 'blur'
+      trigger: ['blur', 'input']
     }
   ]
 }
 
 function getInitials(name: string): string {
+  if (!name) return 'US'
   return name
     .split(' ')
     .map(part => part.charAt(0))
@@ -231,18 +279,70 @@ function formatDate(dateString: string) {
 
 async function loadUser() {
   try {
+    loading.value = true
+    errorMessage.value = ''
+    
+    // Verificar se tem token
+    const token = localStorage.getItem('token')
+    if (!token) {
+      errorMessage.value = 'Usuário não autenticado. Faça login novamente.'
+      loading.value = false
+      return
+    }
+
+    setupAxiosHeaders()
+    
     const response = await axios.get('http://localhost:8000/api/user')
-    user.value = response.data
-    resetForm()
-  } catch (error) {
-    console.error('Erro ao carregar perfil:', error)
-    message.error('Erro ao carregar dados do perfil')
+    lastResponse.value = response
+    let userData = null
+    
+    if (response.data.data) {
+      userData = response.data.data
+    } else if (response.data.user) {
+      userData = response.data.user
+    } else {
+      userData = response.data
+    }
+
+    if (userData && userData.name) {
+      user.value = userData
+      resetForm()
+    } else {
+      throw new Error('Estrutura de dados do usuário inválida')
+    }
+    
+  } catch (error: any) {
+    
+    if (error.response) {
+      console.error('Status:', error.response.status)
+      console.error('Data:', error.response.data)
+      
+      if (error.response.status === 401) {
+        errorMessage.value = 'Sessão expirada. Faça login novamente.'
+        message.error('Sessão expirada. Faça login novamente.')
+        localStorage.removeItem('token')
+      } else if (error.response.status === 404) {
+        errorMessage.value = 'Endpoint não encontrado. Verifique a URL da API.'
+        message.error('Endpoint não encontrado. Verifique a URL da API.')
+      } else if (error.response.status === 500) {
+        errorMessage.value = 'Erro interno do servidor. Tente novamente mais tarde.'
+        message.error('Erro interno do servidor.')
+      } else {
+        errorMessage.value = `Erro ${error.response.status}: ${error.response.data?.message || 'Erro ao carregar perfil'}`
+        message.error(errorMessage.value)
+      }
+    } else if (error.request) {
+      console.error(' Sem resposta do servidor:', error.request)
+      errorMessage.value = 'Servidor não respondendo. Verifique se o backend está rodando na porta 8000.'
+      message.error('Servidor não respondendo. Verifique se o backend está rodando.')
+    } else {
+      errorMessage.value = 'Erro inesperado: ' + error.message
+      message.error('Erro inesperado: ' + error.message)
+    }
   } finally {
-    setTimeout(() => (loading.value = false), 300)
+    loading.value = false
   }
 }
-
-onMounted(loadUser)
 
 function resetForm() {
   userForm.value.name = user.value.name
@@ -260,7 +360,6 @@ async function saveProfile() {
   try {
     saving.value = true
     
-    // Validação do formulário
     await formRef.value?.validate()
 
     const payload: any = {
@@ -268,25 +367,40 @@ async function saveProfile() {
       email: userForm.value.email
     }
 
-    if (userForm.value.password) {
+    if (userForm.value.password && userForm.value.password.trim() !== '') {
       payload.password = userForm.value.password
       payload.password_confirmation = userForm.value.password_confirmation
     }
 
+    setupAxiosHeaders()
     const response = await axios.put('http://localhost:8000/api/user', payload)
-    user.value = response.data.user
+    
+    let userData = null
+    
+    if (response.data.data) {
+      userData = response.data.data
+    } else if (response.data.user) {
+      userData = response.data.user
+    } else {
+      userData = response.data
+    }
+
+    user.value = userData
     isEditing.value = false
     resetForm()
     
-    message.success(response.data.message || 'Perfil atualizado com sucesso!')
+    message.success('Perfil atualizado com sucesso!')
   } catch (error: any) {
     console.error('Erro ao salvar perfil:', error)
     
-    if (error.response?.data?.errors) {
-      const errors = Object.values(error.response.data.errors).flat()
-      errors.forEach((err: any) => message.error(err))
-    } else if (error.message) {
-      message.error('Erro ao salvar perfil: ' + error.message)
+    if (error.response?.status === 422) {
+      const errors = error.response.data.errors
+      Object.values(errors).flat().forEach((err: any) => {
+        message.error(err)
+      })
+    } else if (error.response?.status === 401) {
+      message.error('Sessão expirada. Faça login novamente.')
+      localStorage.removeItem('token')
     } else {
       message.error('Erro ao salvar perfil.')
     }
@@ -294,292 +408,124 @@ async function saveProfile() {
     saving.value = false
   }
 }
+
+onMounted(() => {
+  loadUser()
+})
 </script>
 
 <style scoped>
-/* Wrapper para garantir margens seguras */
-.page-wrapper {
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* Container principal */
 .profile-card {
   max-width: 600px;
-  margin: 20px auto;
-  border: 1px solid #e8e8e8;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  box-sizing: border-box; /* IMPORTANTE: inclui padding e border na largura */
+  margin: 0 auto;
 }
 
-.loading-container {
-  padding: 20px 0;
+.loading-container,
+.no-user-container {
+  padding: 20px;
+  text-align: center;
 }
 
-/* Seção do avatar */
-.profile-view .avatar-section {
+.avatar-section {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .user-avatar {
-  flex-shrink: 0;
+  margin-right: 16px;
 }
 
-.user-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.user-info .user-name {
+.user-info h2 {
   margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #1f2937;
-  word-break: break-word;
-  line-height: 1.3;
+  color: #333;
 }
 
-.user-info .user-email {
+.user-email {
   margin: 4px 0 0 0;
-  color: #6b7280;
-  font-size: 14px;
-  word-break: break-all;
-  line-height: 1.4;
+  color: #666;
 }
 
-/* Divisor */
 .custom-divider {
-  margin: 20px 0;
+  margin: 24px 0;
 }
 
-/* Layout mobile para informações do perfil */
 .profile-info-mobile {
+  display: block;
+}
+
+@media (min-width: 768px) {
+  .profile-info-mobile {
+    display: none;
+  }
+}
+
+.profile-details-desktop {
   display: none;
-  flex-direction: column;
-  gap: 16px;
-  margin: 20px 0;
+}
+
+@media (min-width: 768px) {
+  .profile-details-desktop {
+    display: block;
+  }
 }
 
 .info-item {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px;
-  background: #f8f9fa;
-  border-radius: 8px;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .info-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-weight: 500;
+  color: #666;
 }
 
 .info-value {
-  font-size: 14px;
-  color: #1f2937;
-  word-break: break-word;
+  color: #333;
 }
 
-/* Desktop: mantém o n-descriptions */
-.profile-details-desktop {
-  margin: 20px 0;
-}
-
-/* Botões */
 .actions {
-  display: flex;
-  justify-content: flex-end;
   margin-top: 24px;
+  text-align: center;
 }
 
 .form-actions {
   display: flex;
   gap: 12px;
-  justify-content: flex-end;
   margin-top: 24px;
 }
 
 .action-btn {
-  min-width: 140px;
+  flex: 1;
 }
 
-/* Formulário */
-.responsive-form {
-  width: 100%;
+.password-collapse {
+  margin-bottom: 20px;
 }
 
 .form-input {
   width: 100%;
 }
 
-.password-collapse {
-  margin: 16px 0;
-}
-
-/* Transições melhoradas */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition: opacity 0.3s ease;
 }
-.fade-enter-from {
-  opacity: 0;
-  transform: translateY(10px);
-}
+
+.fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-  transform: translateY(-10px);
 }
 
-/* RESPONSIVIDADE MOBILE */
 @media (max-width: 768px) {
-  .page-wrapper {
-    padding: 0 12px; /* Margens seguras nas laterais */
-  }
-  
-  .profile-card {
-    margin: 12px 0; /* Remove margens laterais, usa apenas do wrapper */
-    max-width: none;
-    width: 100%; /* Ocupa 100% do espaço disponível no wrapper */
-    border-radius: 8px;
-    box-sizing: border-box;
-  }
-  
-  /* Garante que o conteúdo interno também respeite os limites */
-  .profile-card :deep(.n-card__content) {
-    padding: 16px;
-  }
-  
-  /* Esconde o n-descriptions no mobile */
-  .profile-details-desktop {
-    display: none;
-  }
-  
-  /* Mostra o layout mobile */
-  .profile-info-mobile {
-    display: flex;
-  }
-  
-  .avatar-section {
-    flex-direction: column;
-    text-align: center;
-    gap: 12px;
-    margin-bottom: 20px;
-  }
-  
-  .user-info {
-    width: 100%;
-    text-align: center;
-  }
-  
-  .user-info .user-name {
-    font-size: 20px;
-  }
-  
-  .user-info .user-email {
-    font-size: 13px;
-  }
-  
-  .custom-divider {
-    margin: 16px 0;
-  }
-  
-  .actions {
-    justify-content: center;
-    margin-top: 20px;
-  }
-  
   .form-actions {
     flex-direction: column;
-    gap: 8px;
-  }
-  
-  .action-btn {
-    width: 100%;
-    min-width: auto;
-  }
-}
-
-@media (max-width: 480px) {
-  .page-wrapper {
-    padding: 0 8px; /* Menos padding em telas muito pequenas */
   }
   
   .profile-card {
-    margin: 8px 0;
-    border-radius: 6px;
-  }
-  
-  .profile-card :deep(.n-card__content) {
-    padding: 14px;
-  }
-  
-  .user-info .user-name {
-    font-size: 18px;
-  }
-  
-  .user-info .user-email {
-    font-size: 12px;
-  }
-  
-  .info-item {
-    padding: 10px;
-  }
-  
-  .info-label {
-    font-size: 11px;
-  }
-  
-  .info-value {
-    font-size: 13px;
-  }
-  
-  .custom-divider {
-    margin: 12px 0;
-  }
-}
-
-/* Para telas muito pequenas */
-@media (max-width: 320px) {
-  .page-wrapper {
-    padding: 0 4px;
-  }
-  
-  .profile-card {
-    margin: 4px 0;
-  }
-  
-  .profile-card :deep(.n-card__content) {
-    padding: 12px;
-  }
-  
-  .user-info .user-name {
-    font-size: 16px;
-  }
-  
-  .user-info .user-email {
-    font-size: 11px;
-  }
-  
-  .info-item {
-    padding: 8px;
-  }
-}
-
-/* Garante que não haja overflow horizontal em nenhum caso */
-@media (max-width: 768px) {
-  .page-wrapper {
-    overflow-x: hidden;
-  }
-  
-  .profile-card {
-    overflow: hidden;
+    margin: 16px;
   }
 }
 </style>
