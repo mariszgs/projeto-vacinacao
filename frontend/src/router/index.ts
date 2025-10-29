@@ -8,6 +8,7 @@ import PetsView from '../pages/Pets/View.vue';
 import PetsEdit from '../pages/Pets/Edit.vue';
 import Profile from '../pages/Profile.vue';
 import Schedule from '../pages/Schedule.vue';
+import ScheduleEdit from '../pages/ScheduleEdit.vue';
 import Vaccines from '../pages/Vaccines.vue';
 import VaccinesCreate from '../pages/VaccinesCreate.vue';
 import VaccinesEdit from '../pages/VaccinesEdit.vue';
@@ -77,8 +78,12 @@ const routes = [
         path: 'vaccines/view/:id',
         name: 'vaccines-view',
         component: VaccinesView
+      },
+      {
+        path: 'schedule/edit/:id',
+        name: 'schedule-edit',
+        component: ScheduleEdit
       }
-
     ]
   }
 ];
