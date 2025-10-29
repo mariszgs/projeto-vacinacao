@@ -2,7 +2,6 @@
   <div class="login-page">
     <div class="login-container">
       <n-card 
-        :title="isRegistering ? 'Criar Conta' : 'Login'" 
         class="login-card"
         :bordered="true"
       >
@@ -208,16 +207,27 @@ async function handleLogin() {
       password: form.value.password
     });
 
+    // DEBUG: Ver a estrutura completa da resposta
+    console.log('Resposta completa do login:', response.data);
+    
+    // Verificar qual campo do token está sendo retornado
+    const token = response.data.access_token || response.data.token;
+    console.log('Token encontrado:', token ? 'SIM' : 'NÃO');
+    
+    if (!token) {
+      throw new Error('Token não encontrado na resposta');
+    }
+
     // Salvando o token
-    localStorage.setItem('token', response.data.access_token);
+    localStorage.setItem('token', token);
 
     // Configura Axios para todas as requisições
-    axios.defaults.headers.common['Authorization'] = 'Bearer ' + response.data.access_token;
+    axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
 
     message.success('Login realizado com sucesso!');
     router.push('/home');
   } catch (error: any) {
-    console.error(error);
+    console.error('Erro no login:', error);
     if (error.response?.status === 401) {
       message.error('Credenciais inválidas.');
     } else if (error.response?.data?.message) {
