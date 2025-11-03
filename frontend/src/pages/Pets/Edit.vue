@@ -102,17 +102,18 @@
             type="primary" 
             size="small" 
             @click="editVaccine(vac.id)"
-            class="edit-btn"
+            class="edit-btn mobile-btn"
           >
-            Editar
+            <span class="btn-text">Editar</span>
           </n-button>
           <n-button 
             type="error" 
             size="small" 
             @click="cancelVaccine(vac.id)"
-            class="cancel-btn"
+            class="cancel-btn mobile-btn"
           >
-            Cancelar
+            <span class="btn-text">Cancelar</span>
+            <span class="btn-icon">❌</span>
           </n-button>
         </div>
       </div>
@@ -132,18 +133,18 @@
       size="small" 
       :disabled="currentPage === 1" 
       @click="currentPage--"
-      class="page-btn"
+      class="page-btn mobile-btn"
     >
-      Anterior
+      <span class="btn-text">Anterior</span>
     </n-button>
     <span class="page-info">Página {{ currentPage }} de {{ totalPages }}</span>
     <n-button 
       size="small" 
       :disabled="currentPage === totalPages" 
       @click="currentPage++"
-      class="page-btn"
+      class="page-btn mobile-btn"
     >
-      Próxima
+      <span class="btn-text">Próxima</span>
     </n-button>
   </div>
 </div>
@@ -177,18 +178,18 @@
               type="primary" 
               @click="savePet" 
               size="large"
-              class="action-btn"
+              class="action-btn mobile-btn"
               :loading="saving"
             >
-              Salvar Alterações
+              <span class="btn-text">Salvar Alterações</span>
             </n-button>
             <n-button 
               @click="goBack" 
               size="large"
-              class="action-btn"
+              class="action-btn mobile-btn"
               :disabled="saving"
             >
-              Cancelar
+              <span class="btn-text">Cancelar</span>
             </n-button>
           </div>
         </n-form>
@@ -673,6 +674,22 @@ onMounted(() => {
   transform: translateY(-10px);
 }
 
+/* ESTILOS RESPONSIVOS PARA BOTÕES MOBILE */
+.mobile-btn {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.btn-text {
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+
+.btn-icon {
+  display: none;
+  transition: all 0.3s ease;
+}
+
 /* RESPONSIVIDADE MOBILE */
 @media (max-width: 768px) {
   .page-container {
@@ -706,12 +723,27 @@ onMounted(() => {
   
   .vaccine-actions {
     width: 100%;
-    justify-content: flex-end;
+    justify-content: stretch;
+    gap: 6px;
   }
   
   .vaccine-actions .n-button {
     flex: 1;
     min-width: 0;
+    padding: 8px 12px;
+    height: auto;
+    min-height: 36px;
+  }
+  
+  /* Botões compactos para mobile */
+  .mobile-btn {
+    padding: 8px 12px !important;
+    min-width: auto !important;
+    width: 100%;
+  }
+  
+  .btn-text {
+    font-size: 13px;
   }
   
   .action-buttons {
@@ -753,20 +785,57 @@ onMounted(() => {
   
   .vaccine-content {
     padding: 10px;
+    gap: 10px;
   }
   
   .vaccine-actions {
-    flex-direction: column;
+    flex-direction: row;
     width: 100%;
     gap: 6px;
   }
   
   .vaccine-actions .n-button {
-    width: 100%;
+    flex: 1;
+    padding: 6px 8px;
+    min-height: 32px;
+  }
+  
+  /* Botões ainda mais compactos */
+  .mobile-btn {
+    padding: 6px 8px !important;
+    min-height: 32px;
+  }
+  
+  .btn-text {
+    font-size: 12px;
+  }
+  
+  /* Para telas muito pequenas, mostrar apenas ícones */
+  @media (max-width: 360px) {
+    .btn-text {
+      display: none;
+    }
+    
+    .btn-icon {
+      display: inline-block;
+      font-size: 14px;
+    }
+    
+    .vaccine-actions .n-button {
+      padding: 6px !important;
+      min-width: 40px !important;
+      flex: 0 1 auto;
+    }
+    
+    .mobile-btn {
+      padding: 6px !important;
+      min-width: 40px !important;
+      width: auto;
+      flex: 0 1 auto;
+    }
   }
 }
 
-/* Para telas muito pequenas */
 @media (max-width: 320px) {
   .page-container {
     padding: 4px;
@@ -778,6 +847,7 @@ onMounted(() => {
   
   .vaccine-content {
     padding: 8px;
+    gap: 8px;
   }
   
   .vaccine-name {
@@ -786,6 +856,16 @@ onMounted(() => {
   
   .vaccine-date {
     font-size: 11px;
+  }
+  
+  .vaccine-actions .n-button {
+    padding: 4px 6px !important;
+    min-height: 28px;
+  }
+  
+  .mobile-btn {
+    padding: 4px 6px !important;
+    min-height: 28px;
   }
 }
 
@@ -859,5 +939,4 @@ onMounted(() => {
     padding: 4px;
   }
 }
-
 </style>
