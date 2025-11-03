@@ -119,18 +119,17 @@ async function fetchPets(page = 1) {
     
     const response = await api.get("/pets", {
       params: { 
-        per_page: perPage.value, // Mudei de 'limit' para 'per_page' (padrão Laravel)
+        per_page: perPage.value,
         page 
       },
     });
-
-    let petsArray: any[] = [];
+    let petsArray = [];
     let totalCount = 0;
 
-    // Laravel Resource com paginação
     if (response.data.data && Array.isArray(response.data.data)) {
       petsArray = response.data.data;
-      totalCount = response.data.meta?.total || response.data.total || 0;
+      totalCount = response.data.meta.total; 
+      console.log(`Total de pets: ${totalCount}, Última página: ${response.data.meta.last_page}`);
     } 
     // Estrutura alternativa (sem paginação)
     else if (Array.isArray(response.data)) {
@@ -138,12 +137,12 @@ async function fetchPets(page = 1) {
       totalCount = response.data.length;
     }
 
-    pets.value = petsArray
-      .map((pet: any) => ({
-        ...pet,
-        age: formatarIdade(pet.birthdate),
-      }))
-      .sort((a, b) => a.id - b.id);
+   pets.value = petsArray
+  .map((pet: any) => ({
+    ...pet,
+    age: formatarIdade(pet.birthdate),
+  }))
+  .sort((a: Pet, b: Pet) => a.id - b.id); 
 
     totalPets.value = totalCount;
     currentPage.value = page;
@@ -246,7 +245,11 @@ const columns = [
   },
 ];
 
-const totalPages = computed(() => Math.ceil(totalPets.value / perPage.value));
+const totalPages = computed(() => {
+  const pages = Math.ceil(totalPets.value / perPage.value);
+  console.log(`Cálculo: ${totalPets.value} / ${perPage.value} = ${pages} páginas`);
+  return pages;
+});
 function nextPage() {
   if (currentPage.value < totalPages.value) fetchPets(currentPage.value + 1);
 }
