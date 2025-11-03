@@ -58,7 +58,7 @@
               <n-text>{{ user.email }}</n-text>
             </n-descriptions-item>
             <n-descriptions-item label="Membro desde">
-              <n-text type="info">{{ formatDate(user.created_at) }}</n-text>
+              <n-text>{{ formatDate(user.created_at) }}</n-text>
             </n-descriptions-item>
           </n-descriptions>
 
@@ -519,13 +519,141 @@ onMounted(() => {
   opacity: 0;
 }
 
+/* RESPONSIVIDADE PARA MOBILE */
 @media (max-width: 768px) {
+  .profile-card {
+    margin: 16px auto;
+    width: calc(100% - 32px);
+  }
+
   .form-actions {
     flex-direction: column;
+    gap: 12px;
+    margin-top: 24px;
+    width: 100%;
+  }
+
+  .action-btn {
+    width: 100%;
+    min-height: 48px; /* Altura mínima para touch */
+    font-size: 16px; /* Tamanho de fonte ideal para mobile */
+    font-weight: 500;
+  }
+
+  /* Botão salvar */
+  .form-actions .action-btn:first-child {
+    order: 1; /* Garante que o Salvar fique em primeiro */
+  }
+
+  /* Botão cancelar */
+  .form-actions .action-btn:last-child {
+    order: 2;
+    background-color: transparent;
+  }
+
+  /* Botão de editar perfil (modo visualização) */
+  .actions .action-btn {
+    width: 100%;
+    min-height: 48px;
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  .responsive-form {
+    padding: 0 4px;
+  }
+
+  /* Ajustes nos inputs para mobile */
+  .form-input {
+    font-size: 16px; /* Previnir zoom no iOS */
+  }
+
+  /* Ajustes no collapse de senha */
+  .password-collapse {
+    margin-bottom: 16px;
+  }
+
+  /* Ajustes na seção do avatar */
+  .avatar-section {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .user-avatar {
+    margin-right: 0;
+  }
+
+  .info-item {
+    flex-direction: column;
+    gap: 4px;
+    padding: 16px 0;
+  }
+}
+
+/* Pra telas muito pequenas */
+@media (max-width: 480px) {
+  .profile-card {
+    margin: 12px auto;
+    width: calc(100% - 24px);
+  }
+
+  .form-actions {
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .action-btn {
+    min-height: 44px;
+    font-size: 15px;
+  }
+
+  /* Ajuste no padding dos botões para telas pequenas */
+  :deep(.n-button) {
+    padding: 0 16px;
+  }
+}
+
+/* Pra telas médias (tablets) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .profile-card {
+    max-width: 500px;
+  }
+
+  .form-actions {
+    gap: 16px;
+  }
+
+  .action-btn {
+    min-height: 44px;
+  }
+}
+
+/* efeitos de hover pra desktop */
+@media (min-width: 769px) {
+  .action-btn:hover {
+    transform: translateY(-1px);
+    transition: transform 0.2s ease;
+  }
+}
+
+@media (max-width: 320px) {
+  .action-btn {
+    min-height: 42px;
+    font-size: 14px;
   }
   
-  .profile-card {
-    margin: 16px;
+  .form-actions {
+    gap: 8px;
   }
+}
+
+:deep(.n-button__icon) {
+  font-size: 18px;
+}
+
+.action-btn:focus {
+  outline: 2px solid #18a058;
+  outline-offset: 2px;
 }
 </style>
