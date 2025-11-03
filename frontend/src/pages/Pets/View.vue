@@ -1,154 +1,225 @@
 <template>
-  <n-card 
-    title="Detalhes do Pet"
-    class="pet-detail-card"
-    :bordered="true"
-  >
-    <!-- Transição suave -->
-    <transition name="fade" mode="out-in">
-      <div v-if="pet" key="content">
-        <!-- Informações do Pet -->
-        <div class="pet-header">
+  <div class="page-container">
+    <n-card 
+      title="Detalhes do Pet"
+      class="pet-detail-card"
+      :bordered="true"
+    >
+      <!-- Transição suave -->
+      <transition name="fade" mode="out-in">
+        <div v-if="pet && !loading" key="content">
+          <!-- Informações do Pet -->
+          <div class="pet-header">
+            <div class="pet-info">
+              <h2 class="pet-name">{{ pet.name }}</h2>
+              <p class="pet-species">{{ pet.species }}</p>
+            </div>
+          </div>
+
+          <n-divider class="custom-divider" />
+
+          <!-- Informações básicas -->
+          <div class="basic-info">
+            <div class="info-item">
+              <span class="info-label">Nome</span>
+              <span class="info-value">{{ pet.name }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Espécie</span>
+              <span class="info-value">{{ pet.species || 'Não informada' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Raça</span>
+              <span class="info-value">{{ pet.breed || 'Não informada' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Data de Nascimento</span>
+              <span class="info-value">{{ formatDateBR(pet.birthdate) }}</span>
+            </div>
+          </div>
+
+          <!-- Vacinas Aplicadas -->
+          <div class="vaccines-section">
+            <div class="section-header">
+              <h3 class="section-title">Vacinas Aplicadas</h3>
+            </div>
+            <div class="vaccines-list" v-if="vacinasComNome.length">
+              <n-card
+              v-for="petVacina in vacinasComNome"
+              :key="petVacina.id"
+              class="vaccine-card"
+              >
+                <div class="vaccine-content">
+                  <div class="vaccine-info">
+                    <span class="vaccine-name">{{ petVacina.nomeExibicao }}</span>
+                    <span class="vaccine-date">{{ formatDateBR(petVacina.data_aplicacao) }}</span>
+                  </div>
+                  <div class="vaccine-actions">
+                    <n-tag 
+                      :type="isVacinaAtrasada(petVacina) ? 'error' : 'success'"
+                      size="small"
+                      class="status-tag"
+                    >
+                      {{ isVacinaAtrasada(petVacina) ? 'Atrasada' : 'Em Dia' }}
+                    </n-tag>
+                 
+                  </div>
+                </div>
+                <div v-if="petVacina.data_proxima_dose" class="next-dose">
+                  <span class="next-dose-label">Próxima dose:</span>
+                  <span class="next-dose-date">{{ formatDateBR(petVacina.data_proxima_dose) }}</span>
+                </div>
+              </n-card>
+            </div>
+            <n-empty v-else description="Nenhuma vacina aplicada" class="empty-state">
+              <template #extra>
+                <n-button size="small" @click="showApplyVaccineModal = true">
+                  Aplicar Primeira Vacina
+                </n-button>
+              </template>
+            </n-empty>
+          </div>
+
+          <!-- Vacinas Agendadas -->
+          <div class="vaccines-section">
+            <div class="section-header">
+              <h3 class="section-title">Vacinas Agendadas</h3>
+            </div>
+            <div class="vaccines-list" v-if="filteredAgendamentos.length">
+              <n-card
+                v-for="agendamento in filteredAgendamentos"
+                :key="agendamento.id"
+                class="vaccine-card"
+              >
+                <div class="vaccine-content">
+                  <div class="vaccine-info">
+                    <span class="vaccine-name">{{ agendamento.vacina?.nome || 'Vacina' }}</span>
+                    <span class="vaccine-date">{{ formatDateBR(agendamento.data_agendada) }}</span>
+                    <span class="vaccine-status" :class="`status-${agendamento.status}`">
+                      {{ getStatusText(agendamento.status) }}
+                    </span>
+                  </div>
+                  <n-tag 
+                    :type="getStatusTagType(agendamento.status)"
+                    size="small" 
+                    class="status-tag"
+                  >
+                    {{ getStatusText(agendamento.status) }}
+                  </n-tag>
+                </div>
+                <div v-if="agendamento.observacoes" class="observacoes">
+                  <span class="observacoes-label">Observações:</span>
+                  <span class="observacoes-text">{{ agendamento.observacoes }}</span>
+                </div>
+              </n-card>
+            </div>
+            <n-empty v-else description="Nenhuma vacina agendada" class="empty-state">
+              <template #extra>
+                <n-button size="small" @click="goToSchedule(pet.id)">
+                  Fazer Primeiro Agendamento
+                </n-button>
+              </template>
+            </n-empty>
+          </div>
+
+          <!-- Botões de ação -->
+          <div class="action-buttons">
+            <n-button @click="goToEdit(pet.id)" type="primary" class="action-btn">
+              Editar Pet
+            </n-button>
+            <n-button @click="goBack" class="action-btn">
+              Voltar
+            </n-button>
+          </div>
+        </div>
+
+        <!-- Loading state -->
+        <div v-else-if="loading" key="loading" class="loading-container">
+          <n-skeleton height="32px" width="200px" style="margin-bottom: 20px;" />
+          <n-skeleton height="20px" :repeat="3" style="margin-bottom: 8px;" />
+        </div>
+
+        <!-- Error state -->
+        <div v-else key="error" class="empty-state">
+          <n-empty description="Pet não encontrado">
+            <template #extra>
+              <n-button size="small" @click="goBack">
+                Voltar
+              </n-button>
+            </template>
+          </n-empty>
+        </div>
+      </transition>
+    </n-card>
+
+    <!-- Modal para aplicar vacina -->
+    <n-modal v-model:show="showApplyVaccineModal">
+      <n-card
+        style="width: 500px"
+        title="Aplicar Vacina"
+        :bordered="false"
+        size="huge"
+        role="dialog"
+        aria-modal="true"
+      >
+        <n-form
+          ref="vaccineFormRef"
+          :model="vaccineForm"
+          :rules="vaccineRules"
+          label-placement="top"
+        >
+          <n-form-item label="Vacina" path="vacina_id">
+            <n-select
+              v-model:value="vaccineForm.vacina_id"
+              placeholder="Selecione a vacina"
+              :options="vacinasOptions"
+              :loading="loadingVacinas"
+            />
+          </n-form-item>
           
-          <div class="pet-info">
-            <h2 class="pet-name">{{ pet.name }}</h2>
-            <p class="pet-species">{{ pet.species }}</p>
-          </div>
-        </div>
+          <n-form-item label="Data de Aplicação" path="data_aplicacao">
+            <n-date-picker
+              v-model:value="vaccineForm.data_aplicacao"
+              type="date"
+              placeholder="Selecione a data"
+              style="width: 100%"
+            />
+          </n-form-item>
 
-        <n-divider class="custom-divider" />
+          <n-form-item label="Próxima Dose (Opcional)" path="data_proxima_dose">
+            <n-date-picker
+              v-model:value="vaccineForm.data_proxima_dose"
+              type="date"
+              placeholder="Selecione a data da próxima dose"
+              style="width: 100%"
+            />
+          </n-form-item>
+        </n-form>
 
-        <!-- Informações básicas -->
-        <div class="basic-info">
-          <div class="info-item">
-            <span class="info-label">Nome</span>
-            <span class="info-value">{{ pet.name }}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Espécie</span>
-            <span class="info-value">{{ pet.species }}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Data de Nascimento</span>
-            <span class="info-value">{{ formatDateBR(pet.birthdate) }}</span>
-          </div>
-        </div>
-
-        <!-- Vacinas Aplicadas -->
-        <div class="vaccines-section">
-          <h3 class="section-title">Vacinas Aplicadas</h3>
-          <div class="vaccines-list" v-if="vacinasAplicadas.length">
-            <n-card
-              v-for="vacina in vacinasAplicadas"
-              :key="vacina.id"
-              class="vaccine-card"
-            >
-              <div class="vaccine-content">
-                <div class="vaccine-info">
-                  <span class="vaccine-name">{{ vacina.vacina.nome }}</span>
-                  <span class="vaccine-date">{{ formatDateBR(vacina.data_aplicacao) }}</span>
-                </div>
-                <n-tag 
-                  :type="isVacinaAtrasada(vacina) ? 'error' : 'success'"
-                  size="small"
-                  class="status-tag"
-                >
-                  {{ isVacinaAtrasada(vacina) ? 'Atrasada' : 'Em Dia' }}
-                </n-tag>
-              </div>
-              <div v-if="vacina.data_proxima_dose" class="next-dose">
-                <span class="next-dose-label">Próxima dose:</span>
-                <span class="next-dose-date">{{ formatDateBR(vacina.data_proxima_dose) }}</span>
-              </div>
-            </n-card>
-          </div>
-          <n-empty v-else description="Nenhuma vacina aplicada" class="empty-state">
-            <template #extra>
-              <n-button size="small" @click="goToSchedule(pet.id)">
-                Agendar Vacinação
-              </n-button>
-            </template>
-          </n-empty>
-        </div>
-
-        <!-- Vacinas Agendadas -->
-        <div class="vaccines-section">
-          <h3 class="section-title">Vacinas Agendadas</h3>
-          <div class="vaccines-list" v-if="paginatedVacinasAgendadas.length">
-            <n-card
-              v-for="vacina in paginatedVacinasAgendadas"
-              :key="vacina.id"
-              class="vaccine-card"
-            >
-              <div class="vaccine-content">
-                <div class="vaccine-info">
-                  <span class="vaccine-name">{{ vacina.vacina.nome }}</span>
-                  <span class="vaccine-date">{{ formatDateBR(vacina.data_agendada) }}</span>
-                </div>
-                <n-tag type="info" size="small" class="status-tag">
-                  Agendada
-                </n-tag>
-              </div>
-            </n-card>
-          </div>
-          <n-empty v-else description="Nenhuma vacina agendada" class="empty-state">
-            <template #extra>
-              <n-button size="small" @click="goToSchedule(pet.id)">
-                Agendar Vacinação
-              </n-button>
-            </template>
-          </n-empty>
-
-          <!-- Paginação -->
-          <div v-if="totalPages > 1" class="pagination">
-            <n-button
-              size="small"
-              :disabled="currentPage === 1"
-              @click="currentPage--"
-              class="page-btn"
-            >
-              Anterior
+        <template #footer>
+          <div style="display: flex; justify-content: flex-end; gap: 8px">
+            <n-button @click="showApplyVaccineModal = false">
+              Cancelar
             </n-button>
-            <span class="page-info">Página {{ currentPage }} de {{ totalPages }}</span>
-            <n-button
-              size="small"
-              :disabled="currentPage === totalPages"
-              @click="currentPage++"
-              class="page-btn"
+            <n-button 
+              type="primary" 
+              @click="applyVaccine"
+              :loading="applyingVaccine"
             >
-              Próxima
+              Aplicar Vacina
             </n-button>
           </div>
-        </div>
-
-        <!-- Botões de ação -->
-        <div class="action-buttons">
-          <n-button @click="goToEdit(pet.id)" type="primary" class="action-btn">
-            Editar Pet
-          </n-button>
-          <n-button @click="goToSchedule(pet.id)" type="primary" class="action-btn">
-            Agendar Vacinação
-          </n-button>
-          <n-button @click="goBack" class="action-btn">
-            Voltar
-          </n-button>
-        </div>
-      </div>
-
-      <!-- Loading state -->
-      <div v-else key="loading" class="loading-container">
-        <n-skeleton height="32px" width="200px" style="margin-bottom: 20px;" />
-        <n-skeleton height="20px" :repeat="3" style="margin-bottom: 8px;" />
-      </div>
-    </transition>
-  </n-card>
+        </template>
+      </n-card>
+    </n-modal>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import axios from 'axios'
-import { useMessage, NTag, NEmpty } from 'naive-ui'
+import axios, { AxiosHeaders } from 'axios'
+import { useMessage, NTag, NEmpty, type FormInst, type FormRules } from 'naive-ui'
 
 const message = useMessage()
 const route = useRoute()
@@ -157,102 +228,353 @@ const router = useRouter()
 interface Vacina {
   id: number
   nome: string
+  descricao?: string
+  lote?: string
+  validadedata?: string
 }
 
-interface VacinaAplicada {
+interface PetVacina {
   id: number
-  vacina: Vacina
+  vacina_id: number
+  vacina?: Vacina
   data_aplicacao: string
   data_proxima_dose?: string | null
+  pet_id: number
+  // Campos alternativos que podem vir do backend
+  vacina_nome?: string
+  nome?: string
 }
 
-interface VacinaAgendada {
+interface Agendamento {
   id: number
-  vacina: Vacina
+  pet: { id: number }
+  vacina: { id: number; nome: string }
   data_agendada: string
+  status: 'pendente' | 'concluido' | 'cancelado' | 'realizado'
+  observacoes?: string
 }
 
 interface Pet {
   id: number
   name: string
   species: string
+  breed?: string
   birthdate: string
-  vacinas_aplicadas: VacinaAplicada[]
-  vacinas_agendadas?: VacinaAgendada[]
+  user_id: number
+  created_at: string
+  updated_at: string
+  deleted_at?: string
 }
 
 const pet = ref<Pet | null>(null)
-const vacinasAplicadas = ref<VacinaAplicada[]>([])
-const vacinasAgendadas = ref<VacinaAgendada[]>([])
 const loading = ref(true)
+const petVacinas = ref<PetVacina[]>([])
+const allAgendamentos = ref<Agendamento[]>([]) // Todos os agendamentos
+const vacinasList = ref<Vacina[]>([])
+const loadingVacinas = ref(false)
+const showApplyVaccineModal = ref(false)
+const applyingVaccine = ref(false)
+const deletingVaccineId = ref<number | null>(null)
+const vaccineFormRef = ref<FormInst | null>(null)
 
-const currentPage = ref(1)
-const perPage = ref(5)
-
-// Paginação local
-const totalPages = computed(() => Math.ceil(vacinasAgendadas.value.length / perPage.value))
-const paginatedVacinasAgendadas = computed(() => {
-  const start = (currentPage.value - 1) * perPage.value
-  return vacinasAgendadas.value.slice(start, start + perPage.value)
+// Formulário para aplicar vacina
+const vaccineForm = ref({
+  vacina_id: null as number | null,
+  data_aplicacao: Date.now(),
+  data_proxima_dose: null as number | null
 })
 
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map(part => part.charAt(0))
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
+// Configuração do axios
+const api = axios.create({
+  baseURL: 'http://localhost:8000/api',
+})
+
+// Interceptor para adicionar token (igual à tela que funciona)
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    if (!config.headers) config.headers = new AxiosHeaders()
+    config.headers.set('Authorization', `Bearer ${token}`)
+  }
+  return config
+})
+
+// Computed para obter o nome da vacina (trata diferentes estruturas)
+const vacinasComNome = computed(() => {
+  return petVacinas.value.map(petVacina => {
+    // Tenta diferentes formas de obter o nome da vacina
+    const nomeVacina = 
+      petVacina.vacina?.nome || 
+      petVacina.vacina_nome || 
+      petVacina.nome || 
+      'Vacina'
+    
+    console.log('Processando vacina:', { 
+      id: petVacina.id, 
+      vacina: petVacina.vacina,
+      vacina_nome: petVacina.vacina_nome,
+      nome: petVacina.nome,
+      nomeFinal: nomeVacina
+    })
+    
+    return {
+      ...petVacina,
+      nomeExibicao: nomeVacina
+    }
+  })
+})
+
+// Computed para filtrar agendamentos pelo pet_id
+const filteredAgendamentos = computed(() => {
+  if (!pet.value) return []
+  
+  const agendamentosDoPet = allAgendamentos.value.filter((ag: Agendamento) => 
+    ag.pet?.id === pet.value!.id
+  )
+  
+  console.log('Agendamentos do pet filtrados:', agendamentosDoPet)
+  
+  return agendamentosDoPet.filter((ag: Agendamento) => 
+    ag.status !== 'cancelado' && ag.status !== 'concluido' && ag.status !== 'realizado'
+  )
+})
+
+// Regras de validação para o formulário de vacina
+const vaccineRules: FormRules = {
+  vacina_id: [
+    { required: true, message: 'Selecione uma vacina', trigger: ['blur', 'change'] }
+  ],
+  data_aplicacao: [
+    { required: true, message: 'Informe a data de aplicação', trigger: ['blur', 'change'] }
+  ]
 }
+
+// Options para o select de vacinas
+const vacinasOptions = computed(() => {
+  return vacinasList.value.map(vacina => ({
+    label: vacina.nome,
+    value: vacina.id,
+    description: vacina.descricao
+  }))
+})
 
 // Buscar dados do pet
 async function fetchPet() {
   try {
+    loading.value = true
     const petId = Number(route.params.id)
-    const token = localStorage.getItem('token') || ''
-    const response = await axios.get(`http://127.0.0.1:8000/api/pets/${petId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    const data = response.data
-
-    pet.value = {
-      ...data,
-      vacinas_aplicadas: data.vacinas_aplicadas || [],
-      vacinas_agendadas: data.vacinas_agendadas || data.agendamentos || []
+    
+    if (!petId) {
+      message.error('ID do pet inválido.')
+      router.push('/pets')
+      return
     }
 
-    vacinasAplicadas.value = pet.value?.vacinas_aplicadas ?? []
-    vacinasAgendadas.value = pet.value?.vacinas_agendadas ?? []
+    // Buscar dados do pet
+    const { data } = await api.get(`/pets/${petId}`)
+    
+    let petData = data.data || data
+    console.log('Dados do pet:', petData)
+    
+    pet.value = petData
 
-    // Resetar página se necessário
-    currentPage.value = 1
+    // Buscar vacinas aplicadas ao pet
+    await fetchPetVacinas(petId)
+    
+    // Buscar TODOS os agendamentos
+    await fetchAllAgendamentos()
+
+  } catch (error: any) {
+    console.error('Erro ao buscar pet:', error)
+    
+    if (error.response?.status === 404) {
+      message.error('Pet não encontrado.')
+    } else if (error.response?.status === 401) {
+      message.error('Sessão expirada. Faça login novamente.')
+    } else {
+      message.error('Erro ao carregar dados do pet.')
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+// Buscar vacinas aplicadas ao pet
+async function fetchPetVacinas(petId: number) {
+  try {
+    const { data } = await api.get(`/pets/${petId}/vacinas`)
+    console.log('Resposta completa das vacinas aplicadas:', data)
+    
+    const vacinasData = data.data || data || []
+    console.log('Estrutura de cada vacina aplicada:')
+    vacinasData.forEach((vacina: any, index: number) => {
+      console.log(`Vacina ${index + 1}:`, JSON.stringify(vacina, null, 2))
+    })
+    
+    petVacinas.value = vacinasData
+    
+    // Se as vacinas não vierem com os dados completos, buscar informações adicionais
+    await enriquecerDadosVacinas()
 
   } catch (error) {
-    console.error('Erro ao buscar pet:', error)
-    message.error('Erro ao carregar dados do pet.')
+    console.error('Erro ao buscar vacinas do pet:', error)
+    petVacinas.value = []
+  }
+}
+
+// Enriquecer dados das vacinas se necessário
+async function enriquecerDadosVacinas() {
+  const vacinasSemDadosCompletos = petVacinas.value.filter(pv => 
+    !pv.vacina?.nome && !pv.vacina_nome && !pv.nome
+  )
+  
+  if (vacinasSemDadosCompletos.length > 0) {
+    console.log('Enriquecendo dados de', vacinasSemDadosCompletos.length, 'vacinas')
+    
+    try {
+      // Buscar todas as vacinas disponíveis
+      const { data } = await api.get('/vacinas')
+      const todasVacinas = data.data || data || []
+      
+      // Mapear os nomes das vacinas
+      petVacinas.value = petVacinas.value.map(pv => {
+        if (!pv.vacina?.nome && !pv.vacina_nome && !pv.nome) {
+          const vacinaInfo = todasVacinas.find((v: Vacina) => v.id === pv.vacina_id)
+          if (vacinaInfo) {
+            return {
+              ...pv,
+              vacina: vacinaInfo
+            }
+          }
+        }
+        return pv
+      })
+    } catch (error) {
+      console.error('Erro ao enriquecer dados das vacinas:', error)
+    }
+  }
+}
+
+// Buscar TODOS os agendamentos
+async function fetchAllAgendamentos() {
+  try {
+    const { data } = await api.get('/agendamento-de-vacinas')
+    console.log('Todos os agendamentos:', data)
+    
+    allAgendamentos.value = data.data || data || []
+    console.log('Agendamentos filtrados para o pet:', filteredAgendamentos.value)
+    
+  } catch (error) {
+    console.error('Erro ao buscar agendamentos:', error)
+    allAgendamentos.value = []
+  }
+}
+
+// Buscar lista de vacinas disponíveis
+async function fetchVacinas() {
+  try {
+    loadingVacinas.value = true
+    const response = await api.get('/vacinas')
+    vacinasList.value = response.data.data || response.data || []
+  } catch (error) {
+    console.error('Erro ao buscar vacinas:', error)
+    message.error('Erro ao carregar lista de vacinas')
   } finally {
-    setTimeout(() => (loading.value = false), 300)
+    loadingVacinas.value = false
+  }
+}
+
+// Aplicar vacina ao pet
+async function applyVaccine() {
+  try {
+    await vaccineFormRef.value?.validate()
+    applyingVaccine.value = true
+
+    const payload = {
+      vacina_id: vaccineForm.value.vacina_id,
+      data_aplicacao: new Date(vaccineForm.value.data_aplicacao).toISOString().split('T')[0],
+      data_proxima_dose: vaccineForm.value.data_proxima_dose 
+        ? new Date(vaccineForm.value.data_proxima_dose).toISOString().split('T')[0]
+        : null
+    }
+
+    const response = await api.post(`/pets/${pet.value?.id}/vacinas`, payload)
+    
+    message.success('Vacina aplicada com sucesso!')
+    showApplyVaccineModal.value = false
+    resetVaccineForm()
+    
+    // Recarregar lista de vacinas
+    await fetchPetVacinas(pet.value!.id)
+
+  } catch (error: any) {
+    console.error('Erro ao aplicar vacina:', error)
+    
+    if (error.response?.status === 422) {
+      const errors = error.response.data.errors
+      Object.values(errors).flat().forEach((err: any) => {
+        message.error(err)
+      })
+    } else {
+      message.error('Erro ao aplicar vacina.')
+    }
+  } finally {
+    applyingVaccine.value = false
+  }
+}
+
+// Resetar formulário de vacina
+function resetVaccineForm() {
+  vaccineForm.value = {
+    vacina_id: null,
+    data_aplicacao: Date.now(),
+    data_proxima_dose: null
   }
 }
 
 // Verifica se a vacina está atrasada
-function isVacinaAtrasada(vacina: VacinaAplicada): boolean {
-  if (!vacina.data_aplicacao) return false
+function isVacinaAtrasada(petVacina: PetVacina): boolean {
+  if (!petVacina.data_aplicacao) return false
 
-  const dataAplicacao = new Date(vacina.data_aplicacao).setHours(0, 0, 0, 0)
-  const umAnoAtras = new Date()
-  umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1)
-  umAnoAtras.setHours(0, 0, 0, 0)
-
-  return dataAplicacao <= umAnoAtras.getTime()
+  const dataAplicacao = new Date(petVacina.data_aplicacao)
+  const hoje = new Date()
+  
+  const umAnoDepois = new Date(dataAplicacao)
+  umAnoDepois.setFullYear(umAnoDepois.getFullYear() + 1)
+  
+  return hoje > umAnoDepois
 }
 
 // Formatar data
 function formatDateBR(dateStr: string): string {
   if (!dateStr) return 'Não informada'
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('pt-BR')
+  try {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('pt-BR')
+  } catch {
+    return 'Data inválida'
+  }
+}
+
+// Helper functions para status
+function getStatusText(status: string): string {
+  const statusMap: { [key: string]: string } = {
+    'pendente': 'Pendente',
+    'concluido': 'Concluído', 
+    'cancelado': 'Cancelado',
+    'realizado': 'Realizado'
+  }
+  return statusMap[status] || status
+}
+
+function getStatusTagType(status: string): 'default' | 'info' | 'success' | 'warning' | 'error' {
+  const typeMap: { [key: string]: any } = {
+    'pendente': 'info',
+    'concluido': 'success',
+    'realizado': 'success',
+    'cancelado': 'error'
+  }
+  return typeMap[status] || 'default'
 }
 
 function goBack() {
@@ -267,30 +589,42 @@ function goToSchedule(petId: number) {
   router.push(`/schedule/${petId}`)
 }
 
-onMounted(fetchPet)
+onMounted(() => {
+  fetchPet()
+  fetchVacinas()
+})
 </script>
 
+
 <style scoped>
-/* Container da página - APENAS ESPAÇAMENTO */
+/* Container da página - ESPAÇAMENTO */
 .page-container {
   padding: 20px;
   box-sizing: border-box;
 }
 
-/* Container principal - APENAS O CONTEÚDO */
+/* Container principal - CONTEÚDO */
 .pet-detail-card {
   width: 100%;
   border: 1px solid #e8e8e8;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   background-color: #fff;
-  /* Sem height fixo - altura automática pelo conteúdo */
 }
 
 .loading-container {
   padding: 40px 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
+}
+
+.empty-state {
+  padding: 60px 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
 }
 
@@ -382,7 +716,7 @@ onMounted(fetchPet)
 
 .vaccine-content {
   display: flex;
-  justify-content: between;
+  justify-content: space-between;
   align-items: center;
   gap: 12px;
 }
@@ -403,6 +737,23 @@ onMounted(fetchPet)
 .vaccine-date {
   color: #6b7280;
   font-size: 12px;
+}
+
+.vaccine-status {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-pendente {
+  color: #1890ff;
+}
+
+.status-concluído {
+  color: #52c41a;
+}
+
+.status-cancelado {
+  color: #ff4d4f;
 }
 
 .status-tag {
@@ -429,28 +780,26 @@ onMounted(fetchPet)
   color: #1f2937;
 }
 
-.empty-state {
-  margin: 20px 0;
+.observacoes {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
 }
 
-/* Paginação */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin-top: 20px;
-  padding: 16px 0;
-}
-
-.page-info {
-  font-size: 14px;
+.observacoes-label {
+  font-size: 12px;
   color: #6b7280;
   font-weight: 500;
 }
 
-.page-btn {
-  min-width: 80px;
+.observacoes-text {
+  font-size: 12px;
+  color: #1f2937;
+  margin-left: 8px;
+}
+
+.empty-state {
+  margin: 20px 0;
 }
 
 /* Botões de ação */
@@ -528,15 +877,6 @@ onMounted(fetchPet)
     width: 100%;
     min-width: auto;
   }
-  
-  .pagination {
-    flex-direction: column;
-    gap: 12px;
-  }
-  
-  .page-btn {
-    width: 100%;
-  }
 }
 
 @media (max-width: 480px) {
@@ -562,17 +902,6 @@ onMounted(fetchPet)
   
   .section-title {
     font-size: 16px;
-  }
-}
-
-/* Para telas muito pequenas */
-@media (max-width: 320px) {
-  .page-container {
-    padding: 4px;
-  }
-  
-  .pet-name {
-    font-size: 18px;
   }
 }
 </style>
