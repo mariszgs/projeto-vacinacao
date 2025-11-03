@@ -128,7 +128,7 @@ async function fetchVaccines(page = 1) {
   try {
     const response = await api.get("/vacinas", {
       params: { 
-        limit: perPage.value, 
+        per_page: perPage.value, 
         page: page 
       },
     });
