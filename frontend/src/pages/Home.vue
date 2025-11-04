@@ -44,7 +44,12 @@
             class="alert-section"
             title="Atenção: Vacinas Atrasadas"
           >
-            Existe(m) {{ overdueVaccines }} vacina(s) atrasada(s) que precisa(m) de atenção.
+            <span v-if="overdueVaccines === 1">
+              Existe 1 vacina atrasada que precisa de atenção.
+            </span>
+            <span v-else>
+              Existem {{ overdueVaccines }} vacinas atrasadas que precisam de atenção.
+            </span>
           </n-alert>
 
           <!-- Estatísticas -->
