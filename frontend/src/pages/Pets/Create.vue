@@ -215,17 +215,47 @@ const updateBirthdate = (val: Date | string | null) => {
 };
 
 // Busca vacinas do backend
+// Busca vacinas do backend - CORRIGIDO
 onMounted(async () => {
-  const token = localStorage.getItem('token');
-  const response = await axios.get('http://127.0.0.1:8000/api/vacinas', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  try {
+    const token = localStorage.getItem('token');
+    console.log('Buscando vacinas...'); // Debug
 
-  // array dentro de response.data.items
-  vaccinesOptions.value = response.data.items.map((v: any) => ({
-    label: v.nome,
-    value: v.id
-  }));
+    const response = await axios.get('http://127.0.0.1:8000/api/vacinas', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    console.log('Resposta da API:', response.data); // Debug
+
+    // CORREÇÃO: A resposta vem diretamente como array, não dentro de .items
+    if (Array.isArray(response.data)) {
+      vaccinesOptions.value = response.data.map((v: any) => ({
+        label: v.nome,
+        value: v.id
+      }));
+    } else if (response.data.data && Array.isArray(response.data.data)) {
+      // Se usar paginação ou wrapper 'data'
+      vaccinesOptions.value = response.data.data.map((v: any) => ({
+        label: v.nome,
+        value: v.id
+      }));
+    } else {
+      console.error('Estrutura inesperada:', response.data);
+      vaccinesOptions.value = [];
+    }
+
+    console.log('Vacinas mapeadas:', vaccinesOptions.value); // Debug
+
+  } catch (error: any) {
+    console.error('Erro ao buscar vacinas:', error);
+    
+    if (error.response?.status === 401) {
+      message.error('Sessão expirada. Faça login novamente.');
+      router.push('/login');
+    } else {
+      message.error('Erro ao carregar lista de vacinas');
+    }
+  }
 });
 
 // Label da vacina pelo ID
@@ -293,83 +323,120 @@ async function submitForm() {
       return;
     }
 
-    // Validação extra: datas de vacinas tomadas não podem ser anteriores à data de nascimento
+    console.log('Dados do formulário:', JSON.stringify(form, null, 2));
+
+    // Validação de datas
     const birth = birthdateDate.value;
-    if (!birth) {
-      message.error("Data de nascimento inválida.");
-      return;
-    }
+    if (birth) {
+      for (let i = 0; i < form.vaccinesTaken.length; i++) {
+        const vaccineDateStr = form.vaccinesTakenDates[i];
+        if (!vaccineDateStr) continue;
 
-    for (let i = 0; i < form.vaccinesTaken.length; i++) {
-      const vaccineDateStr = form.vaccinesTakenDates[i];
-      if (!vaccineDateStr) continue;
-
-      const vaccineDate = new Date(vaccineDateStr);
-      if (vaccineDate < birth) {
-        message.error(`A data da vacina "${getVaccineLabel(form.vaccinesTaken[i])}" não pode ser anterior à data de nascimento do pet.`);
-        return;
+        const vaccineDate = new Date(vaccineDateStr);
+        if (vaccineDate < birth) {
+          message.error(`A data da vacina "${getVaccineLabel(form.vaccinesTaken[i])}" não pode ser anterior à data de nascimento do pet.`);
+          return;
+        }
       }
     }
 
-    // Criar pet
+    // Criar pet - COM MAIS DETALHES DE DEBUG
+    console.log('Enviando requisição para criar pet...');
+    
+    const petData = {
+      name: form.name,
+      species: form.species,
+      birthdate: form.birthdate || null
+    };
+
+    console.log('Dados do pet:', petData);
+
     const petResponse = await axios.post(
       'http://127.0.0.1:8000/api/pets',
-      {
-        name: form.name,
-        species: form.species,
-        breed: null,
-        birthdate: form.birthdate || null
-      },
-      { headers: { Authorization: `Bearer ${token}` } }
+      petData,
+      { 
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        } 
+      }
     );
 
-    const petId = petResponse.data.id;
+    console.log('Pet criado com sucesso:', petResponse.data);
+    const petId = petResponse.data.data?.id || petResponse.data.id;
+
+    if (!petId) {
+      throw new Error('ID do pet não retornado na resposta');
+    }
 
     // Vacinas tomadas
+    console.log('Processando vacinas tomadas:', form.vaccinesTaken.length);
     for (let i = 0; i < form.vaccinesTaken.length; i++) {
       const vacinaId = form.vaccinesTaken[i];
-      const dataAplicacao = form.vaccinesTakenDates[i] || null;
-      if (!dataAplicacao) continue;
-
-      await axios.post(
-        `http://127.0.0.1:8000/api/pets/${petId}/vacinas`,
-        {
-          vacina_id: vacinaId,
-          data_aplicacao: dataAplicacao,
-          data_proxima_dose: null
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const dataAplicacao = form.vaccinesTakenDates[i];
+      
+      if (dataAplicacao) {
+        console.log(`Adicionando vacina tomada: ${vacinaId} na data ${dataAplicacao}`);
+        
+        await axios.post(
+          `http://127.0.0.1:8000/api/pets/${petId}/vacinas`,
+          {
+            vacina_id: vacinaId,
+            data_aplicacao: dataAplicacao,
+            data_proxima_dose: null
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
     }
 
     // Vacinas a tomar
+    console.log('Processando vacinas a tomar:', form.vaccinesToTake.length);
     for (let i = 0; i < form.vaccinesToTake.length; i++) {
       const vacinaId = form.vaccinesToTake[i];
-      const dataAgendada = form.vaccinesToTakeDates[i] || null;
-      if (!dataAgendada) continue;
-
-      await axios.post(
-        'http://127.0.0.1:8000/api/agendamento-de-vacinas',
-        {
-          pet_id: petId,
-          vacina_id: vacinaId,
-          data_agendada: dataAgendada,
-          observacoes: ''
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const dataAgendada = form.vaccinesToTakeDates[i];
+      
+      if (dataAgendada) {
+        console.log(`Agendando vacina: ${vacinaId} para ${dataAgendada}`);
+        
+        await axios.post(
+          'http://127.0.0.1:8000/api/agendamento-de-vacinas',
+          {
+            pet_id: petId,
+            vacina_id: vacinaId,
+            data_agendada: dataAgendada,
+            observacoes: ''
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
     }
 
     message.success('Pet cadastrado com sucesso!');
     router.push('/pets');
 
   } catch (error: any) {
-    console.error(error);
-    if (error.response?.data?.errors) {
-      const firstError = Object.values(error.response.data.errors)[0];
-      message.error(firstError as string);
+    console.error('Erro detalhado:', error);
+    
+    if (error.response) {
+      console.error('Status:', error.response.status);
+      console.error('Data:', error.response.data);
+      console.error('Headers:', error.response.headers);
+      
+      if (error.response.data?.errors) {
+        const errors = error.response.data.errors;
+        const firstError = Object.values(errors)[0];
+        message.error(firstError as string);
+      } else if (error.response.data?.message) {
+        message.error(error.response.data.message);
+      } else {
+        message.error(`Erro ${error.response.status} ao cadastrar pet`);
+      }
+    } else if (error.request) {
+      console.error('Request:', error.request);
+      message.error('Erro de conexão com o servidor');
     } else {
-      message.error('Erro ao cadastrar pet.');
+      message.error('Erro inesperado: ' + error.message);
     }
   } finally {
     submitting.value = false;
