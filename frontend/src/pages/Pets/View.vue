@@ -29,10 +29,6 @@
               <span class="info-value">{{ pet.species || 'Não informada' }}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">Raça</span>
-              <span class="info-value">{{ pet.breed || 'Não informada' }}</span>
-            </div>
-            <div class="info-item">
               <span class="info-label">Data de Nascimento</span>
               <span class="info-value">{{ formatDateBR(pet.birthdate) }}</span>
             </div>
